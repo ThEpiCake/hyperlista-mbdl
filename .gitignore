@@ -1,0 +1,43 @@
+# ── Data (נורא כבד, לא לגיט) ──────────────────────────────
+data/
+*.csv
+*.npy
+*.npz
+*.pt
+*.pth
+*.pkl
+
+# ── תוצאות ──────────────────────────────────────────────
+results/sparse/*.png
+results/sparse/*.pdf
+results/images/*.png
+results/images/*.pdf
+results/figures/*.png
+results/figures/*.pdf
+
+# ── Python ───────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# ── Jupyter ──────────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# ── סביבות וירטואליות ─────────────────────────────────────
+venv/
+.venv/
+env/
+.env
+
+# ── OS ───────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── IDE ──────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
