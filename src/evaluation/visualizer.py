@@ -9,8 +9,6 @@ plot_hyperparameter_landscape(...)  — 2-D slice of the (c1, c2, c3) objective
 from __future__ import annotations
 import math
 import numpy as np
-import matplotlib
-matplotlib.use("Agg")   # non-interactive backend; switch to "TkAgg" for interactive
 import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn

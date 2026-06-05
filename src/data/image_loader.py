@@ -17,7 +17,8 @@ from torch.utils.data import Dataset, DataLoader
 import torchvision
 import torchvision.transforms as transforms
 import numpy as np
-from pathlib import Path
+
+from src.operators.dct_operators import dct2_flat, get_dct_basis
 
 
 class CSImageDataset(Dataset):
@@ -110,13 +111,22 @@ def apply_idct2_flat(alpha_flat: torch.Tensor, H: int = 28, W_img: int = 28) -> 
 
 
 def _load_raw_fmnist(data_root: str = "./data", train: bool = True) -> torch.Tensor:
-    """Download/load Fashion-MNIST and return flattened float tensors in [0, 1]."""
+    """Load Fashion-MNIST and return flattened float tensors in [0, 1]."""
     tf = transforms.Compose([
         transforms.ToTensor(),   # scales to [0,1]
     ])
-    ds = torchvision.datasets.FashionMNIST(
-        root=data_root, train=train, download=True, transform=tf
-    )
+    try:
+        ds = torchvision.datasets.FashionMNIST(
+            root=data_root, train=train, download=True, transform=tf
+        )
+    except RuntimeError as exc:
+        split = "train" if train else "test"
+        raise RuntimeError(
+            "Fashion-MNIST is not available locally and torchvision could not "
+            f"download the {split} split. This environment appears to be offline. "
+            f"Download Fashion-MNIST once into {data_root!r}, or run this notebook "
+            "from an environment with network access."
+        ) from exc
     loader = DataLoader(ds, batch_size=len(ds), shuffle=False)
     imgs, _ = next(iter(loader))          # (N, 1, 28, 28)
     imgs = imgs.squeeze(1)                # (N, 28, 28)
@@ -145,7 +155,7 @@ def build_image_cs_dataloaders(
 
     Returns:
         A:            Sensing matrix (m, d)
-        Psi:          DCT basis matrix (d, d) — for reference
+        Psi:          Full 2D-DCT basis matrix (d, d) — for reference
         train_loader: DataLoader yielding (y, alpha, x_flat)
         test_loader:  DataLoader yielding (y, alpha, x_flat)
     """
@@ -155,16 +165,18 @@ def build_image_cs_dataloaders(
 
     d = 784   # 28 * 28
     m = int(measurement_ratio * d)
+    if not 0.0 < measurement_ratio <= 1.0:
+        raise ValueError("measurement_ratio must be in the interval (0, 1].")
 
     # Sensing matrix — random Gaussian, unit-l2-norm columns
     A = torch.randn(m, d, device=device)
     A = A / A.norm(dim=0, keepdim=True)
 
-    Psi = _build_dct2_matrix(28).to(device)  # (28, 28) 1D basis
+    Psi = get_dct_basis(28, 28, device=device)  # (784, 784) full 2D basis
 
     def _process(imgs_flat):
         imgs_flat = imgs_flat.to(device)
-        alpha = apply_dct2_flat(imgs_flat)          # (N, d)
+        alpha = dct2_flat(imgs_flat)                # (N, d)
         y     = alpha @ A.T                          # (N, m)
         if sigma > 0:
             y = y + sigma * torch.randn_like(y)

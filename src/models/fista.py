@@ -35,6 +35,7 @@ class FISTA(nn.Module):
         L: float = None,
     ):
         super().__init__()
+        A = A.detach().clone()
         self.register_buffer("A", A)
         self.lam    = lam
         self.n_iter = n_iter

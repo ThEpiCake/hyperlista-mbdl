@@ -80,7 +80,7 @@ class LISTA(nn.Module):
             # W_y ≈ (1/L) A^T,  W_x ≈ I - (1/L) A^T A
             layer.W_y.weight.copy_((step * A).T)     # (n, m)
             layer.W_x.weight.copy_(
-                torch.eye(A.shape[1]) - step * (A.T @ A)
+                torch.eye(A.shape[1], device=A.device) - step * (A.T @ A)
             )
             nn.init.constant_(layer.log_theta, -2.0)   # softplus(-2) ≈ 0.127
 

@@ -124,9 +124,14 @@ def build_sparse_dataloaders(
     magnitude_std: float = 1.0,
     device: torch.device = None,
     seed: int = 42,
+    A: torch.Tensor = None,
 ):
     """
     Build train / val / test DataLoaders for the synthetic sparse-recovery task.
+
+    Args:
+        A: Optional fixed sensing matrix. If provided, generated signals and
+           measurements reuse this matrix instead of sampling a new one.
 
     Returns:
         A:            Sensing matrix (m, n) on *device*
@@ -139,7 +144,12 @@ def build_sparse_dataloaders(
     torch.manual_seed(seed)
     np.random.seed(seed)
 
-    A = generate_sensing_matrix(m, n, device)
+    if A is None:
+        A = generate_sensing_matrix(m, n, device)
+    else:
+        A = A.to(device)
+        if A.shape != (m, n):
+            raise ValueError(f"Expected A with shape {(m, n)}, got {tuple(A.shape)}.")
 
     N_total = n_train + n_val + n_test
     X_all = generate_sparse_signals(N_total, n, s, magnitude_std, device)

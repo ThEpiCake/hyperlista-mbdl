@@ -44,15 +44,15 @@ def train_epoch(
     total_loss = 0.0
     n_batches  = 0
 
-    for b, x_true in loader:
-        b, x_true = b.to(device), x_true.to(device)
+    for batch in loader:
+        b, x_true = batch[0].to(device), batch[1].to(device)
         optimiser.zero_grad()
 
         if intermediate_weight > 0.0:
             iterates = model(b, return_all=True)
             K = len(iterates)
             # Weighted sum: log(k+1) weight encourages early convergence
-            weights = [torch.log(torch.tensor(float(k + 1))) for k in range(K)]
+            weights = [torch.log(torch.tensor(float(k + 1), device=device)) for k in range(K)]
             total_w = sum(weights)
             loss = sum(w / total_w * nn.functional.mse_loss(x_hat, x_true)
                        for w, x_hat in zip(weights, iterates))
@@ -85,8 +85,8 @@ def evaluate(
     """
     model.eval()
     all_nmse = []
-    for b, x_true in loader:
-        b, x_true = b.to(device), x_true.to(device)
+    for batch in loader:
+        b, x_true = batch[0].to(device), batch[1].to(device)
         x_hat = model(b)
         nmse  = nmse_db(x_hat, x_true)
         all_nmse.append(nmse)

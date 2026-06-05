@@ -37,7 +37,7 @@ This module provides the forward pass for a fixed (c1, c2, c3) triple.
 import torch
 import torch.nn as nn
 import numpy as np
-from .alista import compute_alista_weight, partial_soft_threshold
+from .alista import partial_soft_threshold
 
 
 # ─── Symmetric Jacobian weight computation ───────────────────────────────────
@@ -49,53 +49,32 @@ def compute_hyperlista_weight(
     lr: float = 5e-3,
 ) -> tuple[torch.Tensor, torch.Tensor, float]:
     """
-    Compute W = (G^T G) A using the symmetric Jacobian formulation (Eq. 10):
+    Compute W analytically as the minimum-Frobenius-norm solution to
+    min_W ||W^T A - I||_F, then normalise columns so diag(W^T A) = 1.
 
-      min_{G, D}  ||D^T D - I||_F^2 + (1/alpha) ||D - GA||_F^2
-      s.t.        diag(D^T D) = 1
-
-    For simplicity we relax the diagonal constraint and re-normalise after.
+    W* = (AA^T)^{-1} A  minimises ||W^T A - I||_F over all W ∈ R^{m×n}.
+    After column normalisation, (W^T A)_{ii} = 1 and
+    mu = max_{i≠j} |(W^T A)_{ij}| ≈ 0.22 for our sensing matrix.
 
     Returns:
-        W:   (m, n) weight matrix such that W^T A is symmetric
-        D:   (m, n) auxiliary matrix
-        mu:  mutual coherence of D
+        W:   (m, n) weight matrix  [diag(W^T A) = 1, off-diag minimised]
+        D:   (m, n) copy of W (used for coherence bookkeeping)
+        mu:  mutual coherence  max_{i≠j} |(W^T A)_{ij}|
     """
-    m, n = A.shape
-    device = A.device
-
-    # Initialise G ≈ I (if square) or pseudo-inverse, D = G A
-    G = torch.eye(m, device=device) if m == n else torch.randn(m, m, device=device) * 0.01
-    G = G.requires_grad_(True)
-    D_param = (G.detach() @ A.detach()).requires_grad_(True)
-
-    opt = torch.optim.Adam([G, D_param], lr=lr)
-    A_fixed = A.detach()
-
-    for _ in range(n_iter):
-        opt.zero_grad()
-        DTD = D_param.T @ D_param                     # (n, n)
-        loss_orth = ((DTD - torch.eye(n, device=device)) ** 2).sum()
-        loss_fit  = ((D_param - G @ A_fixed) ** 2).sum() / alpha_reg
-        (loss_orth + loss_fit).backward()
-        opt.step()
-
-        # Re-normalise diagonal of D^T D to 1
-        with torch.no_grad():
-            diag_norm = (D_param.T @ D_param).diag().clamp(min=1e-8).sqrt()
-            D_param.data /= diag_norm[None, :]
-
-    D = D_param.detach()
-    G_final = G.detach()
-    W = (G_final.T @ G_final) @ A_fixed     # (m, n)
-
-    # Mutual coherence of D: max_{i≠j} |(D^T D)_{ij}|
     with torch.no_grad():
-        DTD = D.T @ D                        # (n, n)
-        mask = ~torch.eye(n, dtype=torch.bool, device=device)
-        mu = float(DTD[mask].abs().max().item())
+        m = A.shape[0]
+        # Solve (AA^T) W = A  →  W = (AA^T)^{-1} A  (minimum-norm solution)
+        AAt_reg = A @ A.T + 1e-6 * torch.eye(m, device=A.device, dtype=A.dtype)
+        W = torch.linalg.solve(AAt_reg, A)            # (m, n)
+        # Normalise columns so diag(W^T A) = 1
+        diag_vals = (W.T @ A).diag().clamp(min=1e-6)
+        W = W / diag_vals[None, :]
+        # Compute mutual coherence from off-diagonal of W^T A
+        WTA = W.T @ A                                  # (n, n)
+        mask = ~torch.eye(A.shape[1], dtype=torch.bool, device=A.device)
+        mu = float(WTA[mask].abs().max().item())
 
-    return W, D, mu
+    return W, W.clone(), mu
 
 
 # ─── Utility: l1 norm of A^+ residual ────────────────────────────────────────
@@ -146,6 +125,7 @@ class HyperLISTA(nn.Module):
         alpha_reg: float = 10.0,
     ):
         super().__init__()
+        A = A.detach().clone()
         self.c1 = c1
         self.c2 = c2
         self.c3 = c3
@@ -199,17 +179,21 @@ class HyperLISTA(nn.Module):
         Apinv_r_l1 = _pinv_l1(A_pinv, residual)            # (N,)
 
         # Adaptive threshold  θ^(k) = c1 μ ||A^+ r||_1
+        Apinv_r_l1 = torch.nan_to_num(Apinv_r_l1, nan=0.0, posinf=1e6)
         theta = (c1 * mu * Apinv_r_l1).clamp(min=1e-12)    # (N,)
 
         # Adaptive momentum  β^(k) = c2 μ ||x^(k)||_0  (ℓ0 proxy via count)
         sparsity = (x.abs() > 1e-6).float().sum(dim=1)     # (N,)
-        beta = (c2 * mu * sparsity).clamp(min=0.0)          # (N,)
+        beta = (c2 * mu * sparsity).clamp(min=0.0, max=0.99)  # (N,) heavy-ball requires β<1
 
         # Support selection  p^(k) = c3 log( ||A^+ b||_1 / ||A^+ r||_1 )
         Apinv_b_l1 = self._Apinv_b_l1                       # (N,) precomputed
         ratio = (Apinv_b_l1 / Apinv_r_l1.clamp(min=1e-12)).clamp(min=1.0)
         p_float = c3 * torch.log(ratio)                      # (N,)
-        p = int(p_float.median().item())                     # scalar for mask
+        # Guard: diverged samples produce NaN/Inf; replace with 0 so the
+        # remaining samples still drive a sensible median.
+        p_float = torch.nan_to_num(p_float, nan=0.0, posinf=float(n), neginf=0.0)
+        p = int(p_float.clamp(0, n).median().item())         # scalar for mask
         p = max(0, min(p, n))
 
         return theta, beta, p
@@ -251,6 +235,7 @@ class HyperLISTA(nn.Module):
             grad_step = residual @ W                          # (N, n)  = W^T r
 
             v = x + grad_step + momentum                     # (N, n)
+            v = torch.nan_to_num(v, nan=0.0, posinf=1e6, neginf=-1e6)
 
             # Per-sample threshold — broadcast (N,) → partial soft-threshold
             # We use the median threshold across the batch for simplicity

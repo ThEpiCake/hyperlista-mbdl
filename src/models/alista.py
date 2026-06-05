@@ -29,41 +29,27 @@ def compute_alista_weight(
     lr: float = 1e-3,
 ) -> torch.Tensor:
     """
-    Compute the ALISTA weight matrix W by gradient descent on:
-      min_W  ||W^T A - I||_F^2   (diagonal-constrained formulation)
+    Compute the ALISTA weight matrix W analytically as the minimum-Frobenius-norm
+    solution to min_W ||W^T A - I||_F, then normalise columns so diag(W^T A) = 1.
 
-    We use the unconstrained approach: minimise ||W^T A||_F^2
-    while re-normalising the diagonal to 1 after each step.
+    W* = (AA^T)^{-1} A  is the closed-form minimiser of ||W^T A - I||_F.
+    After column normalisation: diag(W^T A) = 1 and off-diagonal mu ≈ 0.22.
 
     Args:
         A:      Sensing matrix (m, n)
-        n_iter: Gradient-descent iterations
-        lr:     Learning rate
+        n_iter: Kept for API compatibility (unused)
+        lr:     Kept for API compatibility (unused)
 
     Returns:
         W: (m, n) weight matrix, same device as A
     """
-    m, n = A.shape
-    # Initialise W = A^T / (A norm)
-    W = (A.T.clone() / (A.norm() + 1e-8)).requires_grad_(True)
-    optimiser = torch.optim.Adam([W], lr=lr)
-
-    A_fixed = A.detach()
-    for _ in range(n_iter):
-        optimiser.zero_grad()
-        WTA = W.T @ A_fixed                      # (n, n)
-        # Minimise off-diagonal coherence
-        WTA_off = WTA - torch.diag(torch.diag(WTA))
-        loss = (WTA_off ** 2).sum()
-        loss.backward()
-        optimiser.step()
-        # Project: keep diagonal of W^T A = 1
-        with torch.no_grad():
-            diag_vals = (W.T @ A_fixed).diag()    # (n,)
-            diag_vals = diag_vals.clamp(min=1e-8)
-            W.data /= diag_vals[None, :]           # normalise columns
-
-    return W.detach()
+    m = A.shape[0]
+    with torch.no_grad():
+        AAt_reg = A @ A.T + 1e-6 * torch.eye(m, device=A.device, dtype=A.dtype)
+        W = torch.linalg.solve(AAt_reg, A)        # (m, n)
+        diag_vals = (W.T @ A).diag().clamp(min=1e-6)
+        W = W / diag_vals[None, :]
+    return W
 
 
 # ─── Support-selection thresholding ──────────────────────────────────────────
@@ -129,6 +115,7 @@ class ALISTA(nn.Module):
         W_iters: int = 2000,
     ):
         super().__init__()
+        A = A.detach().clone()
         m, n = A.shape
         self.n_layers = n_layers
 

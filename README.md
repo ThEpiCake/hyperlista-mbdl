@@ -118,6 +118,12 @@ A_r, Psi, tr_loader, te_loader = build_image_cs_dataloaders(
 - **Storage:** ~30 MB (train) + ~5 MB (test) per ratio
 - **Format:** Grayscale 28×28 images, automatically converted to 2D-DCT coefficients
 
+If you run the project without internet access, download Fashion-MNIST once in
+an online environment and copy the resulting `data/FashionMNIST/` directory into
+the project. The loader intentionally fails with an explicit offline-data message
+instead of substituting synthetic images, because Part B is meant to evaluate the
+real Fashion-MNIST reconstruction task.
+
 ### Expected Directory Structure (After First Run)
 
 ```
@@ -157,6 +163,13 @@ hyperlista_mbdl_project/
 - ✅ Run the notebooks in order (they auto-generate/download)
 - ✅ Ensure write permissions in the project directory
 - ✅ Check internet connection for Fashion-MNIST download
+
+**Q: "Fashion-MNIST is not available locally..."**
+- The environment is offline or DNS is blocked
+- Run notebook 04 once with network access, or copy a prepared
+  `data/FashionMNIST/` cache into this project
+- Do not replace Fashion-MNIST with random images if you need report-quality
+  Part B results
 
 **Q: "CUDA out of memory"**
 - Reduce `batch_size` in notebooks (e.g., 128 → 64)
