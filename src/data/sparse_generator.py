@@ -131,7 +131,7 @@ def build_sparse_dataloaders(
     magnitude_std: float = 1.0,
     device: torch.device | None = None,
     seed: int = 42,
-    A: torch.Tensor = None,
+    A: torch.Tensor | None = None,
 ):
     """
     Build train / val / test DataLoaders for the synthetic sparse-recovery task.
