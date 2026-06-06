@@ -23,7 +23,7 @@ class FISTA(nn.Module):
         A:         Sensing matrix (m, n)
         lam:       Regularisation coefficient λ
         n_iter:    Number of iterations K
-        compute_L: If True, auto-compute L = σ_max(A)^2
+        compute_L: If True, auto-compute L = o_max(A)^2
         L:         Lipschitz constant override
     """
 

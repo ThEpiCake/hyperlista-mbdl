@@ -38,7 +38,7 @@ def train_epoch(
         intermediate_weight:  If > 0, add weighted sum of intermediate losses
 
     Returns:
-        Average training NMSE (dB) for this epoch
+        Average training MSE loss for this epoch
     """
     model.train()
     total_loss = 0.0
@@ -48,18 +48,29 @@ def train_epoch(
         b, x_true = batch[0].to(device), batch[1].to(device)
         optimiser.zero_grad()
 
+        # Intermediate-layer supervision:
         if intermediate_weight > 0.0:
             iterates = model(b, return_all=True)
             K = len(iterates)
-            # Weighted sum: log(k+1) weight encourages early convergence
-            weights = [torch.log(torch.tensor(float(k + 1), device=device)) for k in range(K)]
-            total_w = sum(weights)
-            loss = sum(w / total_w * nn.functional.mse_loss(x_hat, x_true)
-                       for w, x_hat in zip(weights, iterates))
-            x_hat = iterates[-1]
+
+            final_loss = nn.functional.mse_loss(iterates[-1], x_true)
+
+            weights = torch.tensor(
+                [torch.log(torch.tensor(float(k + 2), device=device)) for k in range(K)],
+                device=device,
+            )
+            weights = weights / weights.sum()
+
+            intermediate_loss = sum(
+                weights[k] * nn.functional.mse_loss(iterates[k], x_true)
+                for k in range(K)
+            )
+
+            loss = final_loss + intermediate_weight * intermediate_loss
         else:
             x_hat = model(b)
-            loss  = nn.functional.mse_loss(x_hat, x_true)
+            loss = nn.functional.mse_loss(x_hat, x_true)
+
 
         loss.backward()
         nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)

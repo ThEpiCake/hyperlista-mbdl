@@ -70,37 +70,43 @@ def get_layerwise_nmse(
     model: nn.Module,
     loader,
     device: torch.device,
-    n_batches: int = 8,
+    n_batches: int | None = None,
 ) -> list[float]:
     """
-    Run model with return_all=True and compute NMSE at each layer.
-
-    Returns:
-        List of NMSE values (dB), one per layer
+    Run model with return_all=True and compute average per-sample NMSE at each layer.
+    Returns NMSE values in dB, one per layer.
     """
+    import math
+
     model.eval()
     model.to(device)
 
-    layer_nmse_sums = None
-    count = 0
+    layer_ratio_sums = None
+    n_samples = 0
 
     for i, batch in enumerate(loader):
-        if i >= n_batches:
+        if n_batches is not None and i >= n_batches:
             break
+
         b, x_true = batch[0].to(device), batch[1].to(device)
         iterates = model(b, return_all=True)
 
-        if layer_nmse_sums is None:
-            layer_nmse_sums = [0.0] * len(iterates)
+        if layer_ratio_sums is None:
+            layer_ratio_sums = [0.0] * len(iterates)
+
+        den = (x_true ** 2).sum(dim=-1).clamp(min=1e-12)
 
         for k, x_hat in enumerate(iterates):
             num = ((x_hat - x_true) ** 2).sum(dim=-1)
-            den = (x_true ** 2).sum(dim=-1).clamp(min=1e-12)
-            nmse = 10.0 * torch.log10((num / den).mean()).item()
-            layer_nmse_sums[k] += nmse
-        count += 1
+            ratios = num / den
+            layer_ratio_sums[k] += ratios.sum().item()
 
-    return [v / count for v in layer_nmse_sums]
+        n_samples += x_true.shape[0]
+
+    return [
+        10.0 * math.log10(max(v / max(n_samples, 1), 1e-30))
+        for v in layer_ratio_sums
+    ]
 
 
 # ─── Image comparison grid ────────────────────────────────────────────────────
