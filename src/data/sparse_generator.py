@@ -39,7 +39,7 @@ class SparseDataset(Dataset):
         return self.b[idx], self.x_true[idx]
 
 
-def generate_sensing_matrix(m: int, n: int, device: torch.device = None) -> torch.Tensor:
+def generate_sensing_matrix(m: int, n: int, device: torch.device | None = None) -> torch.Tensor:
     """
     Generate random Gaussian sensing matrix with unit-l2-norm columns.
 
@@ -64,7 +64,7 @@ def generate_sparse_signals(
     n: int,
     s: int,
     magnitude_std: float = 1.0,
-    device: torch.device = None,
+    device: torch.device | None = None,
 ) -> torch.Tensor:
     """
     Generate N s-sparse vectors of dimension n.
@@ -83,6 +83,9 @@ def generate_sparse_signals(
     """
     if device is None:
         device = torch.device("cpu")
+    
+    # Generate all-zero matrix and fill in s random positions for each signal
+    # X is the ground-truth signal matrix, where each row is an s-sparse vector of dimension n
     X = torch.zeros(N, n, device=device)
     for i in range(N):
         support = torch.randperm(n, device=device)[:s]
@@ -106,7 +109,11 @@ def generate_measurements(
     Returns:
         B: (N, m) measurement matrix
     """
+
+    # Compute noiseless measurements
     B = X @ A.T          # (N, m)
+
+    # Add Gaussian noise if sigma > 0
     if sigma > 0.0:
         B = B + sigma * torch.randn_like(B)
     return B
@@ -122,9 +129,9 @@ def build_sparse_dataloaders(
     n_test: int = 2048,
     batch_size: int = 256,
     magnitude_std: float = 1.0,
-    device: torch.device = None,
+    device: torch.device | None = None,
     seed: int = 42,
-    A: torch.Tensor = None,
+    A: torch.Tensor | None = None,
 ):
     """
     Build train / val / test DataLoaders for the synthetic sparse-recovery task.
@@ -139,25 +146,31 @@ def build_sparse_dataloaders(
         val_loader:   DataLoader
         test_loader:  DataLoader
     """
+
+    # Device and random seeds
     if device is None:
         device = torch.device("cpu")
     torch.manual_seed(seed)
     np.random.seed(seed)
 
+    # Generate sensing matrix A (or move to device if provided)
     if A is None:
         A = generate_sensing_matrix(m, n, device)
     else:
         A = A.to(device)
         if A.shape != (m, n):
             raise ValueError(f"Expected A with shape {(m, n)}, got {tuple(A.shape)}.")
-
+        
+    # Generate signals and measurements
     N_total = n_train + n_val + n_test
     X_all = generate_sparse_signals(N_total, n, s, magnitude_std, device)
     B_all = generate_measurements(A, X_all, sigma)
 
+    # Split into train/val/test sets
     X_tr, X_va, X_te = X_all[:n_train], X_all[n_train:n_train+n_val], X_all[n_train+n_val:]
     B_tr, B_va, B_te = B_all[:n_train], B_all[n_train:n_train+n_val], B_all[n_train+n_val:]
 
+    # Create Datasets and DataLoaders
     train_ds = SparseDataset(A, X_tr, B_tr)
     val_ds   = SparseDataset(A, X_va, B_va)
     test_ds  = SparseDataset(A, X_te, B_te)

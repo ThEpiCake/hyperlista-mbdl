@@ -195,3 +195,61 @@ def build_image_cs_dataloaders(
     test_loader  = DataLoader(test_ds,  batch_size=batch_size, shuffle=False, pin_memory=False)
 
     return A, Psi, train_loader, test_loader
+
+
+def build_pixel_cs_dataloaders(
+    measurement_ratio: float = 0.25,
+    sigma: float = 0.0,
+    batch_size: int = 128,
+    data_root: str = "./data",
+    device: torch.device = None,
+    seed: int = 42,
+):
+    """
+    Build train / test DataLoaders for Fashion-MNIST **pixel-domain** CS.
+
+    No DCT is applied.  FashionMNIST is ~60-70 % sparse in pixel space
+    (dark background), so the sensing model b = A x + noise is applied
+    directly to the flattened pixel vector x ∈ [0,1]^{784}.
+
+    Args:
+        measurement_ratio: m / d  (d = 784), e.g. 0.125, 0.25 or 0.5
+        sigma:             Additive Gaussian noise std-dev on measurements
+        batch_size:        Mini-batch size
+        data_root:         Where to cache the raw dataset
+        device:            Torch device
+        seed:              RNG seed for the sensing matrix
+
+    Returns:
+        A:            Sensing matrix (m, d) on *device*
+        train_loader: DataLoader yielding (b, x_flat) — measurements and pixels
+        test_loader:  DataLoader yielding (b, x_flat)
+    """
+    from torch.utils.data import TensorDataset
+
+    if device is None:
+        device = torch.device("cpu")
+    torch.manual_seed(seed)
+
+    d = 784
+    m = int(measurement_ratio * d)
+    if not 0.0 < measurement_ratio <= 1.0:
+        raise ValueError("measurement_ratio must be in (0, 1].")
+
+    A = torch.randn(m, d, device=device)
+    A = A / A.norm(dim=0, keepdim=True)
+
+    def _make(train: bool) -> TensorDataset:
+        imgs_flat = _load_raw_fmnist(data_root, train=train).to(device)
+        b = imgs_flat @ A.T
+        if sigma > 0:
+            b = b + sigma * torch.randn_like(b)
+        return TensorDataset(b, imgs_flat)
+
+    train_ds = _make(True)
+    test_ds  = _make(False)
+
+    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True,  pin_memory=False)
+    test_loader  = DataLoader(test_ds,  batch_size=batch_size, shuffle=False, pin_memory=False)
+
+    return A, train_loader, test_loader

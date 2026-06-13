@@ -3,7 +3,7 @@ Analytic LISTA (ALISTA) — Liu et al. (2019).
 
 The weight matrix W is computed analytically from A by solving:
 
-  min_{W ∈ R^{m×n}}  ||W^T A||_F^2   s.t.  diag(W^T A) = 1
+  min_{W ∈ R^{mxn}}  ||W^T A||_F^2   s.t.  diag(W^T A) = 1
 
 This reduces the learnable parameters to only per-layer step sizes γ^(k)
 and thresholds θ^(k).

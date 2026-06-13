@@ -4,7 +4,7 @@ Learned ISTA (LISTA) — Gregor & LeCun (2010).
 Each layer k executes:
   x^{k+1} = S_{θk}( W_y^k b + W_x^k x^k )
 
-W_y^k ∈ R^{n×m}, W_x^k ∈ R^{n×n}, θ_k > 0 are all learnable parameters.
+W_y^k ∈ R^{nxm}, W_x^k ∈ R^{nxn}, θ_k > 0 are all learnable parameters.
 
 Trained end-to-end via backpropagation through all K layers (BPTT).
 """
@@ -57,6 +57,7 @@ class LISTA(nn.Module):
     ):
         super().__init__()
         m, n = A.shape
+        self.n = n
         self.n_layers = n_layers
         self.tied     = tied
 
@@ -97,8 +98,7 @@ class LISTA(nn.Module):
         Returns:
             x^K  (N, n)  or  list of (N, n) tensors
         """
-        x = torch.zeros(b.shape[0], self.layers[0].W_x.in_features,
-                        device=b.device, dtype=b.dtype)
+        x = torch.zeros(b.shape[0], self.n, device=b.device, dtype=b.dtype)
         iterates = []
 
         for layer in self.layers:

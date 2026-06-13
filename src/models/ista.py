@@ -11,6 +11,7 @@ where
 
 import torch
 import torch.nn as nn
+from typing import cast
 
 
 def soft_threshold(x: torch.Tensor, theta: float | torch.Tensor) -> torch.Tensor:
@@ -37,7 +38,7 @@ class ISTA(nn.Module):
         lam: float = 0.1,
         n_iter: int = 16,
         compute_L: bool = True,
-        L: float = None,
+        L: float | None = None,
     ):
         super().__init__()
         A = A.detach().clone()
@@ -68,7 +69,9 @@ class ISTA(nn.Module):
         Returns:
             x^K  (N, n)  or  list of (N, n) tensors
         """
-        A, lam, L = self.A, self.lam, self.L
+        # narrow `self.A` to `torch.Tensor` for the type-checker (no runtime change)
+        A = cast(torch.Tensor, self.A)
+        lam, L = self.lam, self.L
         step = 1.0 / L
         theta = lam / L
 
