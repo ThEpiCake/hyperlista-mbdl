@@ -21,7 +21,15 @@ We implement and evaluate **HyperLISTA** — an ultra-lightweight deep-unrolled 
 Evaluation covers two tasks:
 
 - **Part A:** Synthetic sparse vector recovery: $b = Ax^* + \varepsilon$
-- **Part B:** Compressed-sensing image reconstruction from Fashion-MNIST using 2D-DCT domain sparsity
+- **Part B:** Compressed-sensing image reconstruction from Fashion-MNIST in the **pixel domain** (no DCT needed — FashionMNIST is ~65 % sparse in pixel space due to its dark background)
+
+We also systematically compare three **training strategies for unfolded optimizers** (Lecture 6):
+
+| Strategy | Description |
+|----------|-------------|
+| **L1** | Final-layer loss only (standard end-to-end BPTT) |
+| **L2** | Deep supervision — weighted loss at every intermediate layer |
+| **L3** | Sequential/greedy — layer *k* trained while layers 1,…,k−1 are frozen |
 
 ---
 
@@ -30,29 +38,34 @@ Evaluation covers two tasks:
 ```
 hyperlista_mbdl_project/
 ├── notebooks/
-│   ├── 01_sparse_recovery_baselines.ipynb      # ISTA & FISTA sweeps
-│   ├── 02_lista_alista_hyperlista.ipynb         # Trained models, full comparison
-│   ├── 03_sparse_generalization_experiments.ipynb  # OOD tests (Fig. 5 of paper)
-│   └── 04_image_cs_experiments.ipynb           # Fashion-MNIST CS (Part B)
+│   ├── 01_sparse_recovery_baselines.ipynb          # ISTA & FISTA sweeps
+│   ├── 02_lista_alista_hyperlista.ipynb             # Trained models, full comparison
+│   ├── 03_sparse_generalization_experiments.ipynb   # OOD tests (noise, sparsity, sensing matrix)
+│   ├── 04_image_cs_experiments.ipynb               # Fashion-MNIST CS via 2D-DCT (Part B)
+│   ├── 05_training_methods_comparison.ipynb         # L1 / L2 / L3 × {LISTA, LISTA-Tied}
+│   └── 06_fashion_mnist_pixel_domain.ipynb          # Fashion-MNIST pixel-domain CS (no DCT)
 │
 ├── src/
 │   ├── data/
 │   │   ├── sparse_generator.py   # Synthetic sparse dataset
-│   │   └── image_loader.py       # Fashion-MNIST + CS measurements
+│   │   └── image_loader.py       # Fashion-MNIST CS (DCT & pixel-domain loaders)
 │   ├── operators/
 │   │   └── dct_operators.py      # Separable 2D-DCT / IDCT
 │   ├── models/
 │   │   ├── ista.py               # Classical ISTA
 │   │   ├── fista.py              # FISTA with Nesterov momentum
-│   │   ├── lista.py              # LISTA (end-to-end trainable)
+│   │   ├── lista.py              # LISTA — independent or tied weights (tied=True)
 │   │   ├── alista.py             # ALISTA (analytic W, learned γ, θ)
 │   │   └── hyperlista.py         # HyperLISTA (3 hyperparams only)
 │   ├── training/
-│   │   ├── trainer.py            # BPTT training loop with early stopping
+│   │   ├── trainer.py            # BPTT (L1/L2) + sequential greedy (L3) training
 │   │   └── tuner.py              # Gradient-free grid search for HyperLISTA
 │   └── evaluation/
 │       ├── metrics.py            # MSE, NMSE, PSNR, SSIM, runtime
 │       └── visualizer.py         # NMSE-vs-layers, image grids, landscapes
+│
+├── results/
+│   └── checkpoints/              # HyperLISTA hyperparameter JSONs (*.json)
 │
 ├── requirements.txt
 └── README.md
@@ -192,13 +205,27 @@ jupyter notebook 02_lista_alista_hyperlista.ipynb      # all five methods
 jupyter notebook 03_sparse_generalization_experiments.ipynb  # OOD tests
 ```
 
-### Part B — Image CS
+### Training Methods Comparison (Part A extension)
+
+```bash
+jupyter notebook 05_training_methods_comparison.ipynb
+```
+
+Compares L1 / L2 / L3 training strategies × {LISTA, LISTA-Tied}, with ALISTA and HyperLISTA as structural-prior references.
+
+### Part B — Image CS (DCT domain)
 
 ```bash
 jupyter notebook 04_image_cs_experiments.ipynb
 ```
 
-Fashion-MNIST data is downloaded automatically to `./data/`.
+### Part B — Image CS (Pixel domain, per professor feedback)
+
+```bash
+jupyter notebook 06_fashion_mnist_pixel_domain.ipynb
+```
+
+FashionMNIST data is downloaded automatically to `./data/`. Both Part B notebooks share the same dataset.
 
 ---
 
@@ -216,8 +243,21 @@ $$\theta^{(k)} = c_1 \mu \|A^+(Ax^{(k)}-b)\|_1, \quad \beta^{(k)} = c_2 \mu \|x^
 
 The weight matrix $W = (G^TG)A$ is computed analytically (symmetric Jacobian parameterisation).
 
-### DCT-domain CS (Part B)
+### DCT-domain CS (Notebook 04)
 $$y = A\alpha + n = A\Psi x + n, \quad \hat{x} = \Psi^T \hat{\alpha}$$
+
+### Pixel-domain CS (Notebook 06)
+$$b = Ax + n, \quad x \in [0,1]^{784} \text{ (≈65\% sparse in pixel space)}$$
+
+FashionMNIST images have a black background, making pixel vectors naturally sparse — no frequency transform is required.
+
+### Training strategies (Notebook 05)
+
+| Loss | Definition |
+|------|-----------|
+| L1 | $\mathcal{L} = \|x^{(K)} - x^*\|^2$ |
+| L2 | $\mathcal{L} = \|x^{(K)} - x^*\|^2 + \lambda \sum_k w_k \|x^{(k)} - x^*\|^2$ |
+| L3 | Train $\theta_k$ to minimise $\|x^{(k)} - x^*\|^2$ with $\theta_1,\ldots,\theta_{k-1}$ frozen |
 
 ---
 

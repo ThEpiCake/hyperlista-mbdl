@@ -1,6 +1,87 @@
 # Session Summary — HyperLISTA Project
-**Date:** June 5–6, 2026  
-**Author:** Etay Baron  
+
+---
+
+## Session 2 — June 13, 2026
+
+### What was done
+
+Following professor feedback ("compare training methods for unfolded optimizers" and "no DCT needed for MNIST"), two new notebooks and supporting infrastructure were added.
+
+#### New: `src/training/trainer.py` — `train_sequential()`
+
+Implements **L3 (sequential/greedy) training** from Lecture 6:
+- Layer *k* is trained to minimise MSE at its own output while layers 0,…,k−1 are frozen
+- Requires the model to have a `.layers` attribute (e.g. LISTA with `tied=False`)
+- Returns per-layer training history
+
+```python
+hist = train_sequential(model, train_loader, val_loader,
+                        n_epochs_per_layer=20, lr=1e-3, patience=15)
+```
+
+Existing `train()` already covered L1 (`intermediate_weight=0.0`) and L2 (`intermediate_weight>0`).
+
+#### New: `src/data/image_loader.py` — `build_pixel_cs_dataloaders()`
+
+Pixel-domain compressed sensing for FashionMNIST (no DCT):
+- Returns `(A, train_loader, test_loader)` with batches of `(b, x_flat)`
+- Signal model: `b = Ax`, `x ∈ [0,1]^{784}` (naturally ~65 % sparse)
+
+#### New: `notebooks/05_training_methods_comparison.ipynb`
+
+Systematic comparison of L1 / L2 / L3 × {LISTA, LISTA-Tied} with ALISTA and HyperLISTA as reference:
+- LISTA-Tied uses `LISTA(A, n_layers=K, tied=True)` — single (W_y, W_x, θ) shared across all K layers
+- Produces NMSE-vs-layer plot and parameter-efficiency scatter
+
+#### New: `notebooks/06_fashion_mnist_pixel_domain.ipynb`
+
+FashionMNIST CS in pixel domain for measurement ratios {0.125, 0.25, 0.5}:
+- ISTA, FISTA, LISTA, ALISTA, HyperLISTA evaluated with PSNR, SSIM, NMSE
+- Includes sparsity analysis (pixel histogram) and reconstruction image grid
+
+#### Bugfix: `.gitignore`
+- `data/` → `/data/` (root-anchored): the old pattern accidentally excluded `src/data/` Python source files.
+
+### Updated results (Notebook 02, more recent run)
+
+| Model | NMSE @ 16 layers (noiseless) | # Parameters |
+|-------|------------------------------|--------------|
+| ISTA | ~-5.3 dB | 0 |
+| FISTA | ~-11.0 dB | 0 |
+| LISTA | ~-22.6 dB | ~6 M |
+| ALISTA | ~-29.8 dB | 32 |
+| HyperLISTA | **~-61.4 dB** | **3** |
+
+*(Previous session summary listed LISTA at -12.6 dB — that was from an early run. Newer run with updated code gives -22.6 dB.)*
+
+### File map (Session 2)
+
+```
+src/
+  data/
+    image_loader.py   ← added build_pixel_cs_dataloaders()
+  training/
+    trainer.py        ← added train_sequential() (L3 greedy)
+    __init__.py       ← added exports
+  models/
+    __init__.py       ← added exports
+
+notebooks/
+  05_training_methods_comparison.ipynb   ← NEW
+  06_fashion_mnist_pixel_domain.ipynb    ← NEW
+
+results/
+  checkpoints/
+    hyperlista_*_hparams.json            ← NEW (all experiments)
+
+.gitignore  ← fixed data/ → /data/
+```
+
+---
+
+## Session 1 — June 5–6, 2026
+**Author:** Etay Baron
 
 ---
 
@@ -148,17 +229,15 @@ v = torch.nan_to_num(v, nan=0.0, posinf=1e6, neginf=-1e6)
 
 ---
 
-## Current Expected Results (after fixes)
+## Current Expected Results (after all fixes, Session 1 + 2)
 
 | Model | NMSE @ 16 layers (noiseless) | # Parameters |
 |-------|------------------------------|--------------|
 | ISTA | ~-5.3 dB | 0 |
-| FISTA | ~-6.0 dB | 0 |
-| LISTA | ~-12.6 dB | ~6M |
-| ALISTA | ~-30.0 dB | 32 |
-| HyperLISTA | ~-60 dB | **3** |
-
-**Note on LISTA:** Underperforms the paper's expected ~-30 dB. NMSE-vs-layer curve is flat near 0 dB for early layers then drops sharply at the last 3 — likely a local minimum (the model learns to "do nothing" for most layers). Not a code bug; could be improved with more epochs or a different LR schedule. Actually makes for an interesting seminar discussion point.
+| FISTA | ~-11.0 dB | 0 |
+| LISTA | ~-22.6 dB | ~6 M |
+| ALISTA | ~-29.8 dB | 32 |
+| HyperLISTA | **~-61.4 dB** | **3** |
 
 ---
 
