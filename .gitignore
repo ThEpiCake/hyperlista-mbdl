@@ -3,6 +3,8 @@
 *.csv
 *.npy
 *.npz
+# Allow sensing-matrix snapshots (needed to reload checkpoints on CPU)
+!results/checkpoints/A_*.npy
 *.pt
 *.pth
 *.pkl

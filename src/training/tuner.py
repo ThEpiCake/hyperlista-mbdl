@@ -157,6 +157,9 @@ def tune_hyperlista(
     fine_points: int = 7,
     coarse_batches: int = 4,
     fine_batches: int = 8,
+    c1_range: tuple = (0.01, 0.2),
+    c2_range: tuple = (0.005, 0.1),
+    c3_range: tuple = (0.5, 30.0),
     verbose: bool = True,
 ) -> dict:
     """
@@ -170,6 +173,11 @@ def tune_hyperlista(
         fine_points:    Grid points per dim in fine stage
         coarse_batches: Validation batches for coarse stage
         fine_batches:   Validation batches for fine stage
+        c1_range:       (lo, hi) search range for threshold scale c1
+        c2_range:       (lo, hi) search range for momentum scale c2
+        c3_range:       (lo, hi) search range for support-growth c3.
+                        For pixel-domain tasks (non-Gaussian signals) use a
+                        wider range, e.g. (0.05, 5.0).
         verbose:        Print progress
 
     Returns:
@@ -180,6 +188,9 @@ def tune_hyperlista(
     t0 = time.time()
     c1, c2, c3, nmse_coarse = coarse_grid_search(
         model, val_loader, device,
+        c1_range=c1_range,
+        c2_range=c2_range,
+        c3_range=c3_range,
         n_points=coarse_points,
         n_batches=coarse_batches,
         verbose=verbose,

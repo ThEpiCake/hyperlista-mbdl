@@ -2,6 +2,72 @@
 
 ---
 
+## Session 3 — June 14, 2026
+
+### Focus: Audit of notebook results and three bug fixes
+
+#### Finding 1 — CPU/GPU sensing-matrix mismatch (reproducibility bug)
+
+PyTorch uses different RNGs for CPU (Mersenne Twister) and GPU (Philox-4×32). With `seed=42`, `torch.randn(..., device='cuda')` produces a **different** A than `torch.randn(..., device='cpu')`. All notebooks were trained on CUDA, so loading `.pt` checkpoints on CPU gave:
+
+- LISTA: +3.1 dB (worse than random init)
+- ALISTA: +4.8 dB (worse than random init)
+- HyperLISTA: -43 dB (still works — c1/c2/c3 are dimensionless; W recomputed from new A)
+
+**Fix:** Notebooks 05 and 06 now save the sensing matrix as `A_partA.npy` / `A_pixel_<ratio>.npy`. `.gitignore` updated with `!results/checkpoints/A_*.npy` so these files are tracked.
+
+#### Finding 2 — HyperLISTA c3 grid too narrow for pixel domain
+
+On FashionMNIST pixel domain, the tuner found `c3=0.17` (well below the lower bound of the default c3_range=(0.5, 30.0)). The fine-search zoom-in was exploring outside the intended search range, giving only -0.9 dB instead of a potential better result.
+
+**Fix:** `tune_hyperlista()` in `tuner.py` now exposes `c1_range`, `c2_range`, `c3_range` as parameters. Notebook 06 passes `c3_range=(0.01, 5.0)` for the pixel-domain task. **Delete the existing `hyperlista_pixel_*.json` files and re-run notebook 06 on GPU to get improved HyperLISTA results.**
+
+#### Finding 3 — LISTA-Tied beats LISTA-Independent (expected behaviour, documented)
+
+| Method | NMSE | Params |
+|--------|------|--------|
+| LISTA-L1 | -12.6 dB | 6,000,016 |
+| LISTA-L2 | -13.4 dB | 6,000,016 |
+| LISTA-L3 | -12.1 dB | 6,000,016 |
+| LISTA-Tied-L1 | **-17.1 dB** | 375,001 |
+| LISTA-Tied-L2 | -16.7 dB | 375,001 |
+
+LISTA with 6M independent parameters is harder to optimize than the RNN-style tied variant (smoother loss landscape, implicit regularization). This is a real and interesting result worth discussing in the report.
+
+#### Finding 4 — ALISTA and HyperLISTA fail on FashionMNIST pixel domain (expected, not a bug)
+
+```
+ratio=0.25:
+  ISTA      -1.9 dB   SSIM=0.13
+  LISTA    -14.6 dB   SSIM=0.86  ← winner
+  ALISTA    -1.6 dB   SSIM=0.13
+  HyperLISTA -0.9 dB  SSIM=0.09
+```
+
+Root cause: ALISTA/HyperLISTA assume i.i.d. Gaussian sparse signals. FashionMNIST pixels are bounded [0,1] with spatial structure — the Gaussian-sparse prior is wrong. LISTA, being data-driven, learns the actual distribution and wins. This is a demonstration of the MBDL lesson: *wrong inductive bias is worse than no bias*.
+
+### Files changed (Session 3)
+
+```
+.gitignore               ← !results/checkpoints/A_*.npy (new exception)
+src/training/tuner.py    ← tune_hyperlista() now accepts c1_range, c2_range, c3_range
+notebooks/05_training_methods_comparison.ipynb  ← cell-data: saves A_partA.npy
+notebooks/06_fashion_mnist_pixel_domain.ipynb   ← cell-loop: saves A per ratio; wider c3_range
+README.md                ← Added "Reproducibility Note", "Key Findings" sections
+SESSION_SUMMARY.md       ← This section
+```
+
+### Action required before seminar
+
+- **Delete stale pixel-domain HyperLISTA json files** and **re-run notebook 06** on GPU so the wider c3 grid takes effect:
+  ```bash
+  rm results/checkpoints/hyperlista_pixel_*.json
+  jupyter nbconvert --to notebook --execute notebooks/06_fashion_mnist_pixel_domain.ipynb
+  ```
+- Consider re-running notebook 05 LISTA cells with `n_epochs=100, patience=30` to see if LISTA-Independent can close the gap with LISTA-Tied.
+
+---
+
 ## Session 2 — June 13, 2026
 
 ### What was done

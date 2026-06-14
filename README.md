@@ -229,6 +229,69 @@ FashionMNIST data is downloaded automatically to `./data/`. Both Part B notebook
 
 ---
 
+## Reproducibility Note — CPU vs GPU Sensing Matrix
+
+**TL;DR: Run the notebooks on GPU (CUDA). Loading checkpoints on CPU will give garbage results for LISTA and ALISTA.**
+
+PyTorch uses different random-number generators for CPU (Mersenne Twister) and GPU (Philox-4×32). Even with `torch.manual_seed(42)`, `torch.randn(..., device='cuda')` produces a **different matrix** than `torch.randn(..., device='cpu')`. LISTA and ALISTA learn weights that are specific to the training sensing matrix A, so they fail completely if evaluated with a different A.
+
+HyperLISTA is unaffected: its three scalars (c1, c2, c3) are dimensionless ratios, and W is recomputed analytically from whatever A you provide.
+
+**Fix applied (Sessions 3+):**
+- Notebooks 05 and 06 now save `A_partA.npy` / `A_pixel_<ratio>.npy` (tracked by Git, gitignore has `!results/checkpoints/A_*.npy`).
+- To reload a LISTA/ALISTA checkpoint on CPU:
+
+```python
+import numpy as np, torch
+A = torch.from_numpy(np.load('results/checkpoints/A_partA.npy'))
+lista.load_state_dict(torch.load('results/checkpoints/lista_L1.pt', map_location='cpu'))
+```
+
+---
+
+## Key Findings
+
+### Part A — Training Methods (Notebook 05)
+
+| Method | NMSE @ K=16 | # Params | Observation |
+|--------|------------|---------|-------------|
+| LISTA-L1 | -12.6 dB | 6,000,016 | Baseline |
+| LISTA-L2 | -13.4 dB | 6,000,016 | +0.8 dB from deep supervision |
+| LISTA-L3 | -12.1 dB | 6,000,016 | Greedy plateaus after layer 5 |
+| **LISTA-Tied-L1** | **-17.1 dB** | 375,001 | Beats independent LISTA |
+| LISTA-Tied-L2 | -16.7 dB | 375,001 | – |
+| ALISTA | -30.0 dB | 32 | Reference |
+| HyperLISTA | -54.1 dB | 3 | Reference |
+
+**Notable: LISTA-Tied outperforms LISTA-Independent** by ~4.5 dB despite 16× fewer parameters.
+
+*Why?* LISTA with 6M independent parameters has a complex, poorly-conditioned loss landscape. The RNN-style weight tying acts as implicit regularization: all layers must share a single (W_y, W_x, θ), which makes gradient flow smoother and convergence more reliable. This is a concrete example of the MBDL principle: adding structure (even the mild constraint of weight sharing) improves both efficiency and performance.
+
+**L3 observation:** NMSE-vs-layer flattens from layer 5 onward (all log at -12.1 dB). Greedy training optimizes each step independently, so later layers have no incentive to improve over what earlier layers already solved.
+
+### Part B — FashionMNIST Pixel Domain (Notebook 06)
+
+| Method | NMSE (ratio=0.25) | PSNR | SSIM |
+|--------|------------------|------|------|
+| ISTA | -1.9 dB | 8.8 | 0.134 |
+| FISTA | -1.8 dB | 8.7 | 0.135 |
+| **LISTA** | **-14.6 dB** | **23.2** | **0.863** |
+| ALISTA | -1.6 dB | 8.4 | 0.128 |
+| HyperLISTA | -0.9 dB | 7.7 | 0.091 |
+
+**ALISTA and HyperLISTA fail here — and this is expected.**
+
+The reason is a signal-model mismatch:
+
+- ALISTA and HyperLISTA were **designed for i.i.d. Gaussian sparse signals**: `x*` has exactly `s` random non-zero entries drawn from `N(0,1)`.
+- FashionMNIST pixels are bounded `[0,1]`, spatially smooth, and only "soft-sparse" (~51.5% exact zeros). The remaining ~48.5% are *continuous, structured* non-zeros — not Gaussian.
+- HyperLISTA's threshold `θ = c1·μ·‖A⁺(Ax−b)‖₁` calibrates to the residual under a Gaussian sparse model. On FashionMNIST the residual reflects spatial image structure, not sparse noise → threshold zeros out valid signal.
+- For HyperLISTA, the original tuner c3_range=(0.5, 30) was too narrow: optimal c3 ≈ 0.01–0.17 (below the grid's lower bound). Fixed in Session 3 to c3_range=(0.01, 5.0).
+
+**Interpretation for the report:** This is not a bug — it demonstrates a key MBDL lesson: *wrong prior (Gaussian sparse) is worse than no prior at all (LISTA)*. LISTA wins here because it is data-driven and learns the actual image distribution from 51K training images. This motivates the design of HyperLISTA extensions that account for bounded non-negative signals.
+
+---
+
 ## Mathematical Background
 
 ### Measurement model
