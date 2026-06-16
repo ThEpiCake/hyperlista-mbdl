@@ -1,4 +1,4 @@
-# ── Data (נורא כבד, לא לגיט) ──────────────────────────────
+# ── Data (heavy) ──────────────────────────────
 /data/
 *.csv
 *.npy
@@ -8,14 +8,6 @@
 *.pt
 *.pth
 *.pkl
-
-# ── תוצאות ──────────────────────────────────────────────
-results/sparse/*.png
-results/sparse/*.pdf
-results/images/*.png
-results/images/*.pdf
-results/figures/*.png
-results/figures/*.pdf
 
 # ── Python ───────────────────────────────────────────────
 __pycache__/
@@ -29,7 +21,7 @@ build/
 .ipynb_checkpoints/
 *.ipynb_checkpoints
 
-# ── סביבות וירטואליות ─────────────────────────────────────
+# ── virtual Environments ─────────────────────────────────────
 venv/
 .venv/
 env/
