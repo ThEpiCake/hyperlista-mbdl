@@ -14,6 +14,11 @@ import torch.nn as nn
 from .ista import soft_threshold
 
 
+def inverse_softplus(x: torch.Tensor) -> torch.Tensor:
+    """Return y such that softplus(y) = x."""
+    x = torch.clamp(x, min=torch.finfo(x.dtype).eps)
+    return torch.log(torch.expm1(x))
+
 class LISTALayer(nn.Module):
     """Single LISTA layer."""
 
@@ -48,12 +53,12 @@ class LISTA(nn.Module):
         n_layers:   Number of unrolled layers K
         tied:       If True, share W_y and W_x across all layers (fewer params)
     """
-
     def __init__(
         self,
         A: torch.Tensor,
         n_layers: int = 16,
         tied: bool = False,
+        lam: float = 0.1,
     ):
         super().__init__()
         m, n = A.shape
@@ -63,27 +68,31 @@ class LISTA(nn.Module):
 
         if tied:
             single = LISTALayer(m, n)
-            self._init_layer(single, A)
+            self._init_layer(single, A, lam)
             self.layers = nn.ModuleList([single] * n_layers)
         else:
             layers = [LISTALayer(m, n) for _ in range(n_layers)]
             for layer in layers:
-                self._init_layer(layer, A)
+                self._init_layer(layer, A, lam)
             self.layers = nn.ModuleList(layers)
 
     @staticmethod
-    def _init_layer(layer: LISTALayer, A: torch.Tensor):
-        """Initialise weights close to the ISTA parameterisation."""
+    def _init_layer(layer: LISTALayer, A: torch.Tensor, lam: float):
+        """Initialise weights exactly according to the ISTA parameterisation."""
         with torch.no_grad():
             sv = torch.linalg.svdvals(A)
-            L  = float(sv[0] ** 2)
+            L = float(sv[0] ** 2)
             step = 1.0 / L
-            # W_y ≈ (1/L) A^T,  W_x ≈ I - (1/L) A^T A
-            layer.W_y.weight.copy_((step * A).T)     # (n, m)
+
+            # ISTA:
+            # x^{k+1} = S_{lam/L}( (1/L) A^T b + (I - (1/L) A^T A) x^k )
+            layer.W_y.weight.copy_((step * A).T)  # (n, m)
             layer.W_x.weight.copy_(
-                torch.eye(A.shape[1], device=A.device) - step * (A.T @ A)
+                torch.eye(A.shape[1], device=A.device, dtype=A.dtype) - step * (A.T @ A)
             )
-            nn.init.constant_(layer.log_theta, -2.0)   # softplus(-2) ≈ 0.127
+
+            theta0 = torch.tensor(lam / L, device=A.device, dtype=A.dtype)
+            layer.log_theta.copy_(inverse_softplus(theta0))
 
     def forward(
         self,
