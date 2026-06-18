@@ -234,20 +234,33 @@ def train_sequential(
             "and 'n' (signal dimension) attributes."
         )
 
+    if getattr(model, "tied", False):
+        raise ValueError(
+            "train_sequential is intended for untied LISTA-style models. "
+            "For tied models, the same layer object is reused across all iterations, "
+            "so greedy layer-wise training is not well-defined."
+        )
+
     K = model.n_layers
     n_signal = model.n
     history: dict = {"layer_histories": []}
 
-    # Freeze all parameters before greedy training starts
-    for p in model.parameters():
-        p.requires_grad_(False)
-
+    # Greedy layer-wise training
     for k in range(K):
-        # Unfreeze only the k-th layer
+        # Freeze all layers at the beginning of every greedy stage.
+        # This prevents previously trained layers from remaining trainable.
+        for p in model.parameters():
+            p.requires_grad_(False)
+
+        # Unfreeze only the current layer.
         for p in model.layers[k].parameters():
             p.requires_grad_(True)
 
-        active_params = [p for p in model.parameters() if p.requires_grad]
+        active_params = list(model.layers[k].parameters())
+
+        if len(active_params) == 0:
+            raise RuntimeError(f"Layer {k} has no trainable parameters.")
+
         optimiser = torch.optim.Adam(active_params, lr=lr, weight_decay=weight_decay)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             optimiser, mode="min", factor=0.5, patience=10
