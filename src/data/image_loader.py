@@ -110,28 +110,64 @@ def apply_idct2_flat(alpha_flat: torch.Tensor, H: int = 28, W_img: int = 28) -> 
     return x_2d.reshape(N, H * W_img)
 
 
-def _load_raw_fmnist(data_root: str = "./data", train: bool = True) -> torch.Tensor:
-    """Load Fashion-MNIST and return flattened float tensors in [0, 1]."""
+def _load_raw_image_dataset(
+    data_root: str = "./data",
+    train: bool = True,
+    dataset_name: str = "fashionmnist",
+) -> torch.Tensor:
+    """Load MNIST/FashionMNIST and return flattened float tensors in [0, 1]."""
+    dataset_key = dataset_name.lower().replace("-", "").replace("_", "")
+
+    if dataset_key == "mnist":
+        dataset_cls = torchvision.datasets.MNIST
+        pretty_name = "MNIST"
+    elif dataset_key == "fashionmnist":
+        dataset_cls = torchvision.datasets.FashionMNIST
+        pretty_name = "Fashion-MNIST"
+    else:
+        raise ValueError(
+            "dataset_name must be one of {'mnist', 'fashionmnist'}, "
+            f"got {dataset_name!r}."
+        )
+
     tf = transforms.Compose([
         transforms.ToTensor(),   # scales to [0,1]
     ])
+
     try:
-        ds = torchvision.datasets.FashionMNIST(
-            root=data_root, train=train, download=True, transform=tf
+        ds = dataset_cls(
+            root=data_root,
+            train=train,
+            download=True,
+            transform=tf,
         )
     except RuntimeError as exc:
         split = "train" if train else "test"
         raise RuntimeError(
-            "Fashion-MNIST is not available locally and torchvision could not "
+            f"{pretty_name} is not available locally and torchvision could not "
             f"download the {split} split. This environment appears to be offline. "
-            f"Download Fashion-MNIST once into {data_root!r}, or run this notebook "
+            f"Download {pretty_name} once into {data_root!r}, or run this notebook "
             "from an environment with network access."
         ) from exc
+
     loader = DataLoader(ds, batch_size=len(ds), shuffle=False)
     imgs, _ = next(iter(loader))          # (N, 1, 28, 28)
     imgs = imgs.squeeze(1)                # (N, 28, 28)
     imgs_flat = imgs.reshape(len(ds), -1) # (N, 784)
     return imgs_flat
+
+
+def _load_raw_fmnist(data_root: str = "./data", train: bool = True) -> torch.Tensor:
+    """
+    Backward-compatible FashionMNIST loader.
+
+    Kept so older DCT-based code that calls _load_raw_fmnist continues to work.
+    """
+    return _load_raw_image_dataset(
+        data_root=data_root,
+        train=train,
+        dataset_name="fashionmnist",
+    )
 
 
 def build_image_cs_dataloaders(
@@ -204,52 +240,103 @@ def build_pixel_cs_dataloaders(
     data_root: str = "./data",
     device: torch.device = None,
     seed: int = 42,
+    n_val: int = 5000,
+    dataset_name: str = "fashionmnist",
 ):
     """
-    Build train / test DataLoaders for Fashion-MNIST **pixel-domain** CS.
+    Build train / validation / test DataLoaders for MNIST/FashionMNIST pixel-domain CS.
 
-    No DCT is applied.  FashionMNIST is ~60-70 % sparse in pixel space
-    (dark background), so the sensing model b = A x + noise is applied
-    directly to the flattened pixel vector x ∈ [0,1]^{784}.
+    No DCT is applied. FashionMNIST has a dark background and is sparse/compressible
+    in the pixel domain, so the sensing model b = A x + noise is applied directly
+    to the flattened pixel vector x in [0,1]^784.
 
     Args:
-        measurement_ratio: m / d  (d = 784), e.g. 0.125, 0.25 or 0.5
+        measurement_ratio: m / d, where d = 784
         sigma:             Additive Gaussian noise std-dev on measurements
         batch_size:        Mini-batch size
         data_root:         Where to cache the raw dataset
         device:            Torch device
-        seed:              RNG seed for the sensing matrix
+        seed:              RNG seed for sensing matrix, split, and noise
+        n_val:             Number of validation samples taken from the training split
+        dataset_name:      "mnist" or "fashionmnist"
 
     Returns:
-        A:            Sensing matrix (m, d) on *device*
-        train_loader: DataLoader yielding (b, x_flat) — measurements and pixels
+        A:            Sensing matrix (m, d) on device
+        train_loader: DataLoader yielding (b, x_flat)
+        val_loader:   DataLoader yielding (b, x_flat)
         test_loader:  DataLoader yielding (b, x_flat)
     """
     from torch.utils.data import TensorDataset
 
     if device is None:
         device = torch.device("cpu")
+
     torch.manual_seed(seed)
 
     d = 784
     m = int(measurement_ratio * d)
+
     if not 0.0 < measurement_ratio <= 1.0:
         raise ValueError("measurement_ratio must be in (0, 1].")
 
     A = torch.randn(m, d, device=device)
     A = A / A.norm(dim=0, keepdim=True)
 
-    def _make(train: bool) -> TensorDataset:
-        imgs_flat = _load_raw_fmnist(data_root, train=train).to(device)
+    train_full = _load_raw_image_dataset(
+        data_root=data_root,
+        train=True,
+        dataset_name=dataset_name,
+    )
+    test_flat = _load_raw_image_dataset(
+        data_root=data_root,
+        train=False,
+        dataset_name=dataset_name,
+    )
+
+    if not 0 <= n_val < train_full.shape[0]:
+        raise ValueError(
+            f"n_val must be in [0, {train_full.shape[0] - 1}], got {n_val}."
+        )
+
+    generator = torch.Generator().manual_seed(seed)
+    perm = torch.randperm(train_full.shape[0], generator=generator)
+
+    val_idx = perm[:n_val]
+    train_idx = perm[n_val:]
+
+    train_flat = train_full[train_idx]
+    val_flat = train_full[val_idx]
+
+    def _make(imgs_flat: torch.Tensor) -> TensorDataset:
+        imgs_flat = imgs_flat.to(device)
         b = imgs_flat @ A.T
+
         if sigma > 0:
             b = b + sigma * torch.randn_like(b)
+
         return TensorDataset(b, imgs_flat)
 
-    train_ds = _make(True)
-    test_ds  = _make(False)
+    train_ds = _make(train_flat)
+    val_ds = _make(val_flat)
+    test_ds = _make(test_flat)
 
-    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True,  pin_memory=False)
-    test_loader  = DataLoader(test_ds,  batch_size=batch_size, shuffle=False, pin_memory=False)
+    train_loader = DataLoader(
+        train_ds,
+        batch_size=batch_size,
+        shuffle=True,
+        pin_memory=False,
+    )
+    val_loader = DataLoader(
+        val_ds,
+        batch_size=batch_size,
+        shuffle=False,
+        pin_memory=False,
+    )
+    test_loader = DataLoader(
+        test_ds,
+        batch_size=batch_size,
+        shuffle=False,
+        pin_memory=False,
+    )
 
-    return A, train_loader, test_loader
+    return A, train_loader, val_loader, test_loader
