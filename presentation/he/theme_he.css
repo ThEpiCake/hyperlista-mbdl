@@ -1,0 +1,82 @@
+/* ─── HyperLISTA Marp Theme — RTL Hebrew ───────────────────────────── */
+
+@import url('../theme.css');
+
+/* ── RTL base override ── */
+section {
+  direction: rtl;
+  text-align: right;
+  font-family: 'Arial', 'Tahoma', 'Segoe UI', sans-serif;
+}
+
+/* ── Headings stay right-aligned ── */
+h1, h2, h3 {
+  text-align: right;
+}
+
+/* ── Math & code blocks always LTR ── */
+.katex-display, .katex,
+mjx-container,
+pre, pre code {
+  direction: ltr !important;
+  text-align: left !important;
+}
+
+code {
+  direction: ltr;
+  unicode-bidi: embed;
+}
+
+/* ── Blockquote: border moves to RIGHT side ── */
+blockquote {
+  border-left: none;
+  border-right: 5px solid var(--accent);
+  border-radius: 8px 0 0 8px;
+  padding: 14px 20px 14px 14px;
+}
+
+/* ── Tables: keep columns LTR (numbers & model names are English) ── */
+table {
+  direction: ltr;
+  text-align: left;
+  margin-right: auto;
+  margin-left: auto;
+}
+
+/* ── Lists: markers on the right ── */
+ul {
+  padding-right: 1.4em;
+  padding-left: 0;
+  list-style-position: outside;
+}
+
+ul li::marker {
+  color: var(--accent);
+}
+
+/* ── Title slide text ── */
+section.title h1,
+section.title h2,
+section.title p {
+  text-align: right;
+}
+
+/* ── Divider slide ── */
+section.divider h1,
+section.divider p {
+  text-align: center;
+}
+
+/* ── ltr-block utility: wrap equations / code in <div class="ltr"> ── */
+.ltr {
+  direction: ltr;
+  text-align: left;
+  display: block;
+}
+
+/* ── bilingual label: small English annotation inside Hebrew text ── */
+.en {
+  font-style: italic;
+  color: var(--bgu-blue-light);
+  font-size: 0.88em;
+}
