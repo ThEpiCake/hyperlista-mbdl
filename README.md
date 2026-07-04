@@ -45,22 +45,16 @@ We also systematically compare three **training strategies for unfolded optimize
 
 ```
 hyperlista_mbdl_project/
+├── submission/                                  # ★ Final deliverables for grading
+│   ├── MBDL_Final_Report.pdf                    # Final report (10 pages, course format)
+│   ├── MBDL_Seminar_Presentation.pptx           # Seminar slides (16 slides, EN, speaker notes)
+│   └── MBDL_Seminar_Presentation.pdf            # PDF export of the slides
+│
 ├── notebooks/
 │   ├── 01_sparse_recovery_baselines.ipynb      # ISTA & FISTA sweeps (Part A baselines)
 │   ├── 02_lista_alista_hyperlista.ipynb         # LISTA / ALISTA / HyperLISTA, full comparison
 │   ├── 03_ista_unfolding_design_space.ipynb     # Our three scalar models + L1/L2/L3 comparison
-│   ├── 04_real_image_pixel_domain.ipynb         # MNIST/FashionMNIST pixel-domain CS (Part B)
-│   └── archive/                                 # Older exploratory notebooks (DCT-domain CS etc.)
-│
-├── presentation/
-│   ├── MBDL_Seminar_Final.pptx                  # Recorded-seminar slides (16 slides, EN)
-│   ├── MBDL_Seminar_Final.pdf                   # Same deck, PDF export
-│   ├── SPEAKER_SCRIPT.md                        # Per-slide narration script (HE, ~15 min)
-│   └── build_pptx.py                            # Deterministic deck builder (python-pptx)
-│
-├── report/
-│   ├── report.tex                               # Final report (LaTeX, course format)
-│   └── report.pdf                               # Compiled report
+│   └── 04_real_image_pixel_domain.ipynb         # MNIST/FashionMNIST pixel-domain CS (Part B)
 │
 ├── src/
 │   ├── data/
@@ -334,7 +328,7 @@ The weight matrix $W = (G^TG)A$ is computed analytically (symmetric Jacobian par
 ### Pixel-domain CS (Notebook 04)
 $$b = Ax + n, \quad x \in [0,1]^{784} \text{ (≈51.5\% exact zeros in pixel space)}$$
 
-FashionMNIST images have a black background, making pixel vectors naturally sparse — no frequency transform is required. (A DCT-domain variant $y = A\Psi x + n$ is kept in `notebooks/archive/`.)
+FashionMNIST images have a black background, making pixel vectors naturally sparse — no frequency transform is required.
 
 ### Training strategies (Notebook 03)
 

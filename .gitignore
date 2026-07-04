@@ -28,6 +28,12 @@ venv/
 env/
 .env
 
+# ── Internal working files (final deliverables live in submission/) ──
+/presentation/
+/report/
+SESSION_SUMMARY.md
+MBDL_Project_Recording_Summary_HE_EN.pdf
+
 # ── OS ───────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
