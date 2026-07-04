@@ -206,7 +206,15 @@ Figure~\ref{fig:scalar} isolates the contribution of each scalar family. Learnin
 \end{figure}
 
 \paragraph{Training strategies.}
-Deep supervision (L2) is the best training method for untied LISTA ($-21.9$ vs.\ $-20.3$\,dB for L1): intermediate losses stabilize gradients through 16 layers. Greedy layer-wise training (L3) underperforms ($-16.6$\,dB) and its NMSE-versus-layer curve flattens from roughly layer 8 --- each greedy stage optimizes its own output, so later layers have no incentive to improve beyond what earlier layers already achieved. Weight tying loses only $1.2$\,dB relative to untied LISTA while using $16\times$ fewer parameters, acting as implicit regularization.
+Deep supervision (L2) is the best training method for untied LISTA ($-21.9$ vs.\ $-20.3$\,dB for L1): intermediate losses stabilize gradients through 16 layers. Greedy layer-wise training (L3) underperforms ($-16.6$\,dB) and its NMSE-versus-layer curve (Figure~\ref{fig:training}, left) flattens from roughly layer 8 --- each greedy stage optimizes its own output, so later layers have no incentive to improve beyond what earlier layers already achieved. Weight tying loses only $1.2$\,dB relative to untied LISTA while using $16\times$ fewer parameters, acting as implicit regularization. Figure~\ref{fig:training} (right) summarizes the entire design space on an accuracy-versus-parameters map: our scalar models and HyperLISTA occupy the efficient frontier at the bottom left, while all 6M-parameter LISTA variants cluster at the far right with no accuracy advantage.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.49\textwidth]{notebook_03/figures/lista_training_methods_nmse_vs_layers.pdf}\hfill
+\includegraphics[width=0.49\textwidth]{notebook_03/figures/nmse_vs_parameters_tradeoff.pdf}
+\caption{\textbf{Left:} LISTA training strategies (Part A). End-to-end L1 improves mostly in the final layers, deep supervision L2 improves every layer and ends best, and greedy L3 plateaus early. \textbf{Right:} accuracy--parameter trade-off across all evaluated models (bottom-left is ideal). Our StepISTA/StepThresholdISTA and HyperLISTA define the efficient frontier.}
+\label{fig:training}
+\end{figure}
 
 \subsection{Part B: pixel-domain compressed sensing of real images}
 
@@ -232,7 +240,14 @@ HyperLISTA & $-0.3$ & 7.7 & 0.09 & 3\\
 
 The cause is a \emph{signal-model mismatch}. ALISTA's and HyperLISTA's derivations assume i.i.d.\ Gaussian sparse signals with exactly $s$ random non-zeros. Image pixels are bounded in $[0,1]$, non-negative, spatially correlated, and only ``soft-sparse.'' HyperLISTA's residual-driven threshold $\theta^{(k)} = c_1\mu\norm{A^{+}(Ax^{(k)}-b)}_1$, calibrated for sparse Gaussian residuals, instead zeroes out valid image content. LISTA wins precisely because it makes no such assumption --- with $51$K training images it learns the actual pixel distribution.
 
-Sweeping both datasets and both measurement ratios confirms the pattern: on MNIST at ratio $0.5$ (an easy, genuinely sparse task) all methods are reasonable and the structured models degrade gracefully; as the data grow more textured (Fashion-MNIST) and measurements fewer (ratio $0.25$), every prior-based method collapses while LISTA-L2 maintains SSIM $\geq 0.82$ across all four scenarios.
+Sweeping both datasets and both measurement ratios confirms the pattern (Figure~\ref{fig:ssim}): on MNIST at ratio $0.5$ (an easy, genuinely sparse task) all methods are reasonable and the structured models degrade gracefully; as the data grow more textured (Fashion-MNIST) and measurements fewer (ratio $0.25$), every prior-based method collapses while LISTA-L2 maintains SSIM $\geq 0.82$ across all four scenarios.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.62\textwidth]{ssim_heatmap.png}
+\caption{Robustness sweep (Part B): SSIM across \{MNIST, Fashion-MNIST\} $\times$ ratio \{0.25, 0.5\}. LISTA-L2 stays high in all four scenarios; the Gaussian-sparse-prior methods degrade sharply with data complexity and measurement scarcity.}
+\label{fig:ssim}
+\end{figure}
 
 \begin{figure}[h]
 \centering
