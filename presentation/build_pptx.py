@@ -1086,7 +1086,7 @@ def slide_16_references(prs):
         'X. Chen, J. Liu, Z. Wang, W. Yin, "Theoretical Linear Convergence of Unfolded ISTA and Its Practical Weights and Thresholds," NeurIPS 2018.',
         'J. Liu, X. Chen, Z. Wang, W. Yin, "ALISTA: Analytic Weights Are As Good As Learned Weights in LISTA," ICLR 2019.',
         'X. Chen, J. Liu, Z. Wang, W. Yin, "Hyperparameter Tuning is All You Need for LISTA," NeurIPS 2021.',
-        'N. Shlezinger, J. Whang, Y. C. Eldar, A. G. Dimakis, "Model-Based Deep Learning," Proceedings of the IEEE, 2023.',
+        'N. Shlezinger and Y. C. Eldar, "Model-Based Deep Learning," Foundations and Trends in Signal Processing, vol. 17, no. 4, 2023.',
         'Course lecture notes 1–8, Model-Based Deep Learning (361.2.2320), Ben-Gurion University, 2026.',
     ]
     for i, ref in enumerate(refs):
@@ -1094,105 +1094,138 @@ def slide_16_references(prs):
                   W - Inches(1.7), Inches(0.5), f'[{i+1}]  {ref}', size=14, color=TEXT)
 
     _text_box(slide, Inches(0.55), Inches(6.55), W - Inches(1.1), Inches(0.4),
-              'Thank you!  Questions welcome.', size=18, bold=True, color=BGU_BLUE)
+              'Thank you very much for listening!', size=18, bold=True, color=BGU_BLUE)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Main
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# ── Speaker notes (Hebrew narration, ~15 minutes total) ──────────────────────
+# ── Speaker notes (English narration, ~15 minutes total) ─────────────────────
 SPEAKER_NOTES = [
     # 1 Title (~30s)
-    "שלום לכולם, אנחנו איתי ברון ואיתי ויגמן. הפרויקט שלנו עוסק בשחזור אותות דלילים "
-    "ובחישה דחוסה בגישה של למידה עמוקה מבוססת מודל. שאלת הליבה שלנו: כמה רחוק אפשר להגיע "
-    "עם מבנה אלגוריתמי בלבד, ומתי חייבים גמישות נלמדת מהדאטה. נקודת המוצא היא המאמר "
-    "HyperLISTA מ-NeurIPS 2021.",
+    "Hello everyone. We are Etay Baron and Etai Wigman, and this is our final project "
+    "for the Model-Based Deep Learning course. Our topic is sparse recovery and "
+    "compressed sensing, based on the NeurIPS 2021 paper 'Hyperparameter Tuning is All "
+    "You Need for LISTA'. The core question that guides this talk is simple: how far can "
+    "model-based structure take us — and when do we need data-driven flexibility?",
     # 2 Roadmap (~40s)
-    "מבנה ההרצאה: נתחיל ברקע — בעיית LASSO והאלגוריתמים הקלאסיים ISTA ו-FISTA. משם נעבור "
-    "ל-Deep Unrolling: LISTA, ALISTA ו-HyperLISTA. החלק המרכזי הוא המחקר שלנו — אילו רכיבים "
-    "של ISTA שווה ללמוד, והשוואת שיטות אימון לרשתות unfolded. נסיים בניסויי תמונות אמיתיות "
-    "על MNIST ו-FashionMNIST בחישה דחוסה. הסטאפ הסינתטי: 250 מדידות, ממד 500, דלילות 50.",
+    "Here is the plan for the next fifteen minutes. We start with the background: the "
+    "sparse recovery problem, the LASSO formulation, and the classical ISTA and FISTA "
+    "algorithms. We then move to deep unrolling — LISTA, ALISTA, and HyperLISTA. The "
+    "central part is our own study: we ask which components of ISTA are actually worth "
+    "learning, and we compare the training methods for unfolded optimizers that were "
+    "discussed in class. Finally, we stress-test everything on real images — MNIST and "
+    "Fashion-MNIST — under compressed sensing. Our synthetic setup uses 250 measurements, "
+    "signal dimension 500, and sparsity 50.",
     # 3 Motivation (~60s)
-    "בעיית השחזור: יש לנו וקטור דליל x כוכב בממד n, ואנחנו רואים רק m מדידות לינאריות, "
-    "m קטן מ-n, עם רעש אפשרי. הבעיה לא מוגדרת היטב — יש אינסוף פתרונות — אבל הנחת הדלילות "
-    "הופכת אותה לפתירה. זה מופיע בכל מקום: MRI, מכ\"ם, חישה דחוסה. הפורמליזציה הסטנדרטית "
-    "היא LASSO: איזון בין נאמנות למדידות לבין נורמת L1 שמעודדת דלילות. המדדים שלנו: NMSE "
-    "בדציבלים לאותות סינתטיים, ובנוסף PSNR ו-SSIM לתמונות.",
+    "Let us define the problem. We want to recover a sparse vector x-star of dimension n, "
+    "but we only observe m linear measurements, with m smaller than n, possibly with "
+    "noise. This inverse problem is underdetermined — infinitely many signals explain the "
+    "same measurements. The sparsity assumption is what makes it solvable, and this "
+    "situation appears everywhere: MRI acceleration, radar, hyperspectral imaging. The "
+    "standard formulation is the LASSO: a trade-off between fidelity to the measurements "
+    "and an L1 norm that promotes sparsity. Our metrics are NMSE in decibels for "
+    "synthetic signals, plus PSNR and SSIM for images.",
     # 4 Baselines (~60s)
-    "ISTA הוא gradient descent פרוקסימלי על LASSO: צעד גרדיאנט על איבר הנאמנות, ואז "
-    "soft-thresholding שמאפס רכיבים קטנים. FISTA מוסיף מומנטום של נסטרוב ומשפר את קצב "
-    "ההתכנסות מסדר 1 חלקי k לסדר 1 חלקי k בריבוע. אבל שימו לב לנקודה המרכזית: אחרי 16 "
-    "איטרציות בלבד ISTA מגיע רק למינוס 5.3 דציבל ו-FISTA למינוס 11. כדי להגיע למינוס 20 "
-    "צריך מאות איטרציות. השאלה: איך גורמים ל-16 צעדים באמת לעבוד?",
+    "ISTA is proximal gradient descent on the LASSO objective. Each iteration takes a "
+    "gradient step on the data-fidelity term, and then applies soft-thresholding, which "
+    "shrinks small entries to zero. FISTA adds Nesterov momentum and improves the "
+    "convergence rate from order one-over-k to one-over-k-squared. But here is the key "
+    "point: after only sixteen iterations, ISTA reaches just minus 5.3 dB, and FISTA "
+    "minus 11. Reaching minus 20 dB takes hundreds of iterations. So the question is: "
+    "how do we make sixteen steps really count?",
     # 5 Unrolling (~70s)
-    "הרעיון של Gregor ו-LeCun מ-2010: לפרוש את K האיטרציות של ISTA לרשת בעומק K, ולהפוך "
-    "את הקבועים האלגוריתמיים לפרמטרים נלמדים. משמאל — ISTA קלאסי עם צעד ו-threshold קבועים. "
-    "מימין — LISTA: שתי מטריצות משקל ו-threshold נפרד לכל שכבה, הכל נלמד ב-backpropagation "
-    "מזוגות אימון. זה העיקרון של למידה מבוססת מודל: שומרים על המבנה — צעד גרדיאנט ואז "
-    "soft-threshold — ולומדים רק את מה שמשפר שחזור בעומק סופי. בסטאפ שלנו זה כ-6 מיליון פרמטרים.",
+    "The idea, due to Gregor and LeCun in 2010, is to unfold the K iterations of ISTA "
+    "into a network with K layers, and to turn the algorithmic constants into learnable "
+    "parameters. On the left you see classical ISTA, with a fixed step size and a fixed "
+    "threshold. On the right is LISTA: two weight matrices and a separate threshold per "
+    "layer, all trained end-to-end with backpropagation. This is the model-based deep "
+    "learning principle: keep the structure — a gradient step followed by "
+    "soft-thresholding — and learn only what improves reconstruction at a finite depth. "
+    "In our setting this amounts to about six million parameters.",
     # 6 Ladder (~90s)
-    "עכשיו סולם ה-MBDL — פחות פרמטרים, יותר מבנה. LISTA לומד הכל: 6 מיליון פרמטרים ומגיע "
-    "למינוס 20 דציבל. ALISTA מראה שאפשר לחשב את מטריצת המשקל אנליטית מ-A — פתרון בעיית "
-    "מזעור קוהרנטיות — ולהשאיר ללמידה רק צעדים ו-thresholds: 32 פרמטרים, מינוס 30 דציבל. "
-    "HyperLISTA לוקח את זה לקצה: שלושה סקלרים בלבד. ה-threshold, המומנטום ובחירת התומך "
-    "מחושבים אדפטיבית מהשארית בכל שכבה, לפי הנוסחאות שמוצגות. שימו לב — אין בכלל "
-    "backpropagation: שלושת הסקלרים נמצאים ב-grid search. והתוצאה: מינוס 61 דציבל, הטובה "
-    "ביותר. יותר מבנה, פחות פרמטרים, ביצועים טובים יותר — זה עקרון ה-MBDL בפעולה.",
+    "Now the MBDL ladder — more structure, fewer parameters. LISTA learns everything: "
+    "six million parameters, minus 20 dB. ALISTA shows that the weight matrix does not "
+    "need to be learned at all: it can be computed analytically from A, leaving only "
+    "per-layer step sizes and thresholds — 32 parameters, and minus 30 dB. HyperLISTA "
+    "takes this to the extreme: only three scalars. The threshold, the momentum, and the "
+    "support selection are computed adaptively from the residual at every layer, using "
+    "the formulas on the slide. And notice — there is no backpropagation at all: the "
+    "three scalars are found by a simple grid search. The result: minus 61 dB, the best "
+    "of all. More structure, fewer parameters, better performance — this is the MBDL "
+    "principle in action.",
     # 7 Design space (~60s)
-    "זה מוביל לשאלת המחקר שלנו: בין 6 מיליון לשלושה פרמטרים — מה המינימום שבאמת צריך ללמוד? "
-    "עדכון ISTA המוכלל חושף שתי סדרות סקלרים חופשיות: גודל הצעד גמא והסף תטא. בנינו שלושה "
-    "מודלים: ThresholdISTA שלומד רק את הספים, StepISTA שלומד רק את הצעדים כשהסף צמוד אליהם, "
-    "ו-StepThresholdISTA שלומד את שניהם בנפרד — 32 סקלרים בסך הכל. כולם מאותחלים לערכי ISTA "
-    "המדויקים, כך שלפני האימון הם זהים ל-ISTA.",
+    "This leads to our research question: between six million parameters and three, what "
+    "is the minimal set that is actually worth learning? The generalized ISTA update "
+    "exposes two free scalar sequences: the step size gamma and the threshold theta. We "
+    "designed three models. ThresholdISTA learns only the thresholds. StepISTA learns "
+    "only the step sizes, with the threshold tied to them. And StepThresholdISTA learns "
+    "both, independently — 32 scalars in total. All of them are initialized to the exact "
+    "ISTA values, so before training, every model is identical to ISTA.",
     # 8 Scalar results (~70s)
-    "התוצאות מפתיעות בעוצמתן. ThresholdISTA — לימוד ספים בלבד — כמעט לא עוזר: מינוס 7 דציבל. "
-    "אבל StepISTA — לימוד לוחות הצעדים בלבד, 16 סקלרים — קופץ למינוס 20 דציבל ומשתווה ל-LISTA "
-    "המלא עם 6 מיליון פרמטרים. הפרדת הסף מהצעד מוסיפה עוד 3 דציבל בחינם. המסקנה: לוח הצעדים "
-    "הוא הרכיב הקריטי ללמידה בעומק סופי, ולמידת מטריצות מלאות היא בעיקרה מיותרת כשמטריצת "
-    "המדידה קבועה.",
+    "The results are quite striking. Learning thresholds alone barely helps: minus 7 dB. "
+    "But learning the step-size schedule alone — just sixteen scalars — jumps to minus "
+    "20 dB and matches the full LISTA with six million parameters. Decoupling the "
+    "threshold from the step adds another 3.6 dB, essentially for free. The conclusion: "
+    "the step-size schedule is the critical component to learn at finite depth, and "
+    "learning full matrices is largely redundant when the sensing matrix is fixed.",
     # 9 Training methods (~70s)
-    "בהתאם להמלצת המרצה, השווינו גם את שיטות האימון מההרצאות לאותה ארכיטקטורה בדיוק. "
-    "L1 — אימון end-to-end עם loss על השכבה האחרונה. L2 — deep supervision עם loss משוקלל "
-    "על כל שכבת ביניים. L3 — אימון חמדני שכבה-שכבה כשהקודמות מוקפאות. בנוסף בדקנו קשירת "
-    "משקולות — אותה שכבה חוזרת K פעמים, כמו RNN. הממצא המעניין: LISTA קשור עם פי 16 פחות "
-    "פרמטרים מגיע כמעט לאותה תוצאה — קשירת משקולות היא רגולריזציה מובנית.",
+    "Following the training strategies discussed in class, we compared them on the exact "
+    "same architecture. L1 is standard end-to-end training, with a loss on the final "
+    "layer only. L2 is deep supervision: a weighted loss on every intermediate layer. "
+    "L3 is greedy layer-wise training, where each layer is trained while the previous "
+    "ones are frozen. We also tested weight tying — the same layer repeated K times, "
+    "like a recurrent network. The interesting finding: tied LISTA, with sixteen times "
+    "fewer parameters, comes very close to the untied version. Weight tying acts as a "
+    "built-in regularizer.",
     # 10 Sparse results (~60s)
-    "כאן התמונה המלאה על הבעיה הסינתטית. בגרף רואים NMSE כפונקציה של עומק. שיטות האימון "
-    "משנות 3-4 דציבל בתוך משפחת LISTA — L2 הכי טוב, L3 נתקע ברמה מסוימת כי לשכבות מאוחרות "
-    "אין תמריץ להשתפר. אבל ההיררכיה הגדולה נשארת: ALISTA מנצח את כל גרסאות LISTA עם 32 "
-    "פרמטרים, ו-HyperLISTA מנצח את כולם עם 3. כשהנחות המודל נכונות — מבנה מנצח קיבולת.",
+    "Here is the full picture on the synthetic problem: NMSE as a function of depth. The "
+    "training method matters — L2 is the best, and L3 gets stuck around layer eight, "
+    "because later layers have no incentive to improve on what earlier layers already "
+    "solved. But the big hierarchy remains: ALISTA beats every LISTA variant with 32 "
+    "parameters, and HyperLISTA beats everyone with three. When the model assumptions "
+    "hold, structure beats capacity.",
     # 11 Design map (~50s)
-    "מפת ה-design space מסכמת את החלק הסינתטי: ציר X — מספר פרמטרים בסקלה לוגריתמית, ציר Y — "
-    "שגיאת שחזור. הפינה השמאלית-תחתונה היא האידיאל. StepThresholdISTA שלנו — 32 סקלרים — "
-    "יושב באזור מצוין ומנצח את LISTA עם פי 187 אלף פחות פרמטרים. HyperLISTA שובר את הסקלה "
-    "לגמרי. המסר: בבעיות עם מבנה ידוע, תכנון חכם של מה לומדים שווה יותר מקיבולת.",
+    "This map summarizes the synthetic part. The x-axis is the number of parameters on a "
+    "logarithmic scale; the y-axis is the reconstruction error; the bottom-left corner "
+    "is the ideal. Our StepThresholdISTA, with 32 scalars, sits in an excellent spot and "
+    "beats LISTA with 187,000 times fewer parameters. HyperLISTA breaks the scale "
+    "entirely. The message: in problems with known structure, choosing what to learn "
+    "matters more than raw capacity.",
     # 12 Images (~70s)
-    "עכשיו המבחן האמיתי — תמונות אמיתיות. עברנו לחישה דחוסה בפיקסלים על FashionMNIST: "
-    "התמונה שטוחה לווקטור בממד 784, ומודדים רק רבע מהממד. אין צורך ב-DCT כי לתמונות רקע "
-    "שחור והן דלילות בפיקסלים. והנה ההיפוך הדרמטי: כל השיטות המובנות קורסות — ALISTA "
-    "ו-HyperLISTA גרועים אף מ-ISTA — בעוד LISTA-L2 מגיע ל-SSIM של 0.82. הסיבה: ההנחה של "
-    "דלילות גאוסית i.i.d. פשוט לא נכונה לפיקסלים חסומים ומתואמים מרחבית. פריור שגוי גרוע "
-    "מאין-פריור.",
+    "Now the real test — actual images. We moved to pixel-domain compressed sensing on "
+    "Fashion-MNIST: the image is flattened into a 784-dimensional vector, and we measure "
+    "only a quarter of that dimension. No transform is needed, because these images have "
+    "a black background and are naturally sparse in pixels. And here the ranking flips "
+    "completely. All the structured methods collapse — ALISTA and HyperLISTA do even "
+    "worse than plain ISTA — while LISTA with deep supervision reaches an SSIM of 0.82. "
+    "The reason: the assumption of i.i.d. Gaussian sparsity is simply wrong for bounded, "
+    "spatially-correlated pixels. A wrong prior is worse than no prior.",
     # 13 Robustness (~60s)
-    "בדקנו את זה שיטתית על שני דאטהסטים ושני יחסי מדידה. מפת החום מציגה SSIM. "
-    "על MNIST עם חצי מהמדידות — כולם סבירים, כי MNIST דליל באמת: 78 אחוז אפסים. ככל "
-    "שמקשים — פחות מדידות או דאטה מרקמי יותר — השיטות המובנות מתדרדרות בחדות, בעוד "
-    "LISTA-L2 נשאר מעל 0.82 בכל התרחישים. הפריור הדליל מתפרק בהדרגה כשהדאטה מתרחק מההנחות.",
+    "We tested this systematically over two datasets and two measurement ratios; the "
+    "heatmap shows SSIM. On MNIST with half the measurements, every method does fine, "
+    "because MNIST is genuinely sparse — about 78 percent of its pixels are zero. As the "
+    "task gets harder — fewer measurements, or more textured data — the structured "
+    "methods degrade sharply, while LISTA-L2 stays above 0.82 in every scenario. The "
+    "sparse prior breaks down gradually as the data moves away from the assumptions.",
     # 14 Stress tests (~50s)
-    "ההשוואה הוויזואלית ממחישה את המספרים. משמאל MNIST, מימין FashionMNIST, שניהם ברבע "
-    "מהמדידות. שורת LISTA-L2 כמעט זהה למקור בשני המקרים. ALISTA ו-HyperLISTA מאפסים סיגנל "
-    "אמיתי — הסף שמכויל לרעש גאוסי דליל מוחק את התמונה עצמה. רואים כאן ויזואלית מה זה "
-    "אומר כשהפריור שגוי.",
+    "The visual comparison makes the numbers concrete. MNIST is on the left, "
+    "Fashion-MNIST on the right, both with a quarter of the measurements. The LISTA-L2 "
+    "row is almost identical to the originals in both cases. ALISTA and HyperLISTA "
+    "literally erase real signal — a threshold calibrated for sparse Gaussian residuals "
+    "deletes the image itself. This is what a wrong prior looks like.",
     # 15 Conclusions (~60s)
-    "לסיכום, ארבעה לקחים: אחד — כשההנחות מתקיימות, מבנה מנצח: 3 סקלרים מנצחים 6 מיליון "
-    "פרמטרים ב-41 דציבל. שתיים — לוח הצעדים הוא הרכיב הכי חשוב ללמידה. שלוש — קשירת "
-    "משקולות היא רגולריזציה מובנית. ארבע — פריור שגוי מזיק יותר מאין-פריור: על תמונות "
-    "אמיתיות LISTA הגמיש מנצח. בהמשך נרצה לבדוק את המודלים בדומיין DCT או wavelets, שם "
-    "התמונות קרובות יותר להנחת הדלילות הגאוסית.",
-    # 16 References (~20s)
-    "כל הקוד, ארבעת המחברות והמודולים זמינים בריפו ציבורי בגיטהאב. אלו המקורות המרכזיים "
-    "שעליהם התבססנו. תודה רבה על ההקשבה — נשמח לשאלות.",
+    "To summarize, four lessons. One: when the assumptions hold, structure wins — three "
+    "scalars beat six million parameters by 41 dB. Two: the step-size schedule is the "
+    "most valuable thing to learn. Three: weight tying is implicit regularization. Four: "
+    "a wrong prior actively hurts — on real images, the flexible LISTA wins. As future "
+    "work, we would like to test these models in the DCT or wavelet domain, where images "
+    "are much closer to the Gaussian-sparse assumption.",
+    # 16 Close (~20s)
+    "All of our code — the four notebooks and the source modules — is available in a "
+    "public GitHub repository, and these are the main references we built on. Thank you "
+    "very much for listening.",
 ]
 
 

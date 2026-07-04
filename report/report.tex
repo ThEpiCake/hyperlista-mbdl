@@ -28,17 +28,18 @@
 % ═════════════════════════════ Title page ═══════════════════════════════════
 \begin{titlepage}
 \centering
+\includegraphics[width=2.3cm]{bgu_logo.png}\\[0.45cm]
 {\bfseries Ben-Gurion University of the Negev\\
 Faculty of Engineering Science\\
 School of Electrical and Computer Engineering\par}
-\vspace{3cm}
+\vspace{2.5cm}
 {\LARGE\bfseries Sparse Recovery and Compressed Sensing:\\[4pt]
 A Model-Based Deep Learning Approach\par}
 \vspace{0.8cm}
 {\large From ISTA to HyperLISTA --- what is worth learning\\ in a deep-unrolled sparse-recovery network?\par}
 \vspace{2cm}
 {\large\bfseries Final Project Report\par}
-{\large Model-Based Deep Learning (361.2.2320) --- Spring 2025--2026\par}
+{\large Model-Based Deep Learning (361.2.2320) --- Spring 2026\par}
 \vspace{2cm}
 \begin{tabular}{lll}
 \textbf{Students:} & Etay Baron & 209438910\\
@@ -47,13 +48,12 @@ A Model-Based Deep Learning Approach\par}
 \textbf{Code:} & \multicolumn{2}{l}{\url{https://github.com/ThEpiCake/hyperlista-mbdl}}\\
 \end{tabular}
 \vfill
-Based on: X.~Chen, J.~Liu, Z.~Wang, W.~Yin,\\ \emph{``Hyperparameter Tuning is All You Need for LISTA,''} NeurIPS 2021.
 \end{titlepage}
 
 % ═════════════════════════════ Abstract ═════════════════════════════════════
 \begin{abstract}
 \noindent
-Deep unrolling converts the iterations of a model-based optimization algorithm into the layers of a trainable network, combining the interpretability and sample efficiency of classical methods with the finite-depth performance of deep learning. This project studies the unrolling of the Iterative Shrinkage-Thresholding Algorithm (ISTA) for sparse recovery, spanning the full spectrum of learned flexibility: classical ISTA/FISTA (0 learned parameters), our three ISTA-derived scalar models (16--32 parameters), LISTA ($\sim$6M parameters), ALISTA (32 parameters), and HyperLISTA (3 tuned hyperparameters). On synthetic Gaussian sparse recovery, the model-based hierarchy holds strikingly: HyperLISTA attains $-61.4$\,dB NMSE with only 3 scalars, and our StepThresholdISTA (32 scalars) outperforms full LISTA with $187{,}000\times$ fewer parameters, revealing that the per-layer step-size schedule is the single most valuable component to learn. We further compare three training strategies for unfolded optimizers (end-to-end, deep supervision, greedy layer-wise) and weight tying. Finally, we stress-test all methods on pixel-domain compressed sensing of MNIST and Fashion-MNIST images, where the ranking inverts: methods built on an i.i.d.\ Gaussian-sparse prior collapse, while data-driven LISTA remains robust. The two regimes together illustrate a central lesson of model-based deep learning: structure wins when the model matches the data, and a wrong prior is worse than no prior.
+We study deep unrolling of ISTA for sparse recovery across the full spectrum of learned flexibility --- from classical ISTA/FISTA (no learning), through our three original ISTA-derived scalar models (16--32 parameters) and LISTA ($\sim$6M parameters), to ALISTA (32) and HyperLISTA (3 tuned scalars). On synthetic Gaussian-sparse data the model-based hierarchy is striking: HyperLISTA attains $-61.4$\,dB NMSE with three grid-searched scalars, and our StepThresholdISTA outperforms full LISTA with $187{,}000\times$ fewer parameters --- the step-size schedule is the single most valuable component to learn. We also compare training strategies for unfolded optimizers (end-to-end, deep supervision, greedy layer-wise, weight tying). On pixel-domain compressed sensing of MNIST and Fashion-MNIST the ranking inverts: methods built on the Gaussian-sparse prior collapse while data-driven LISTA remains robust --- structure wins when the model matches the data, and a wrong prior is worse than no prior.
 \end{abstract}
 
 \tableofcontents
@@ -69,7 +69,7 @@ Classical sparse-recovery algorithms such as ISTA and FISTA \cite{beck2009fista}
 
 \emph{Model-based deep learning} (MBDL) \cite{shlezinger2023mbdl} bridges the two: the iterative algorithm is \emph{unrolled} into a fixed-depth network whose layers retain the algorithmic structure, and only selected components are learned from data. The seminal example is LISTA \cite{gregor2010lista}, which unrolls ISTA and learns its matrices per layer. A later line of work progressively \emph{re-introduced structure}: LISTA with coupled weights and support selection \cite{chen2018lista}, ALISTA with analytically computed weights \cite{liu2019alista}, and finally HyperLISTA \cite{chen2021hyperlista}, which reduces the entire network to \emph{three} tuned scalars.
 
-This project implements and evaluates this full spectrum, asks \emph{which components of ISTA are actually worth learning}, compares the training strategies for unfolded optimizers discussed in class, and stress-tests the resulting models on real image data under compressed sensing.
+This project implements and evaluates this full spectrum. Our own contributions are: \textbf{(i)} a controlled \emph{design-space study} built on three original ISTA-derived scalar models --- ThresholdISTA, StepISTA and StepThresholdISTA --- that isolate \emph{which components of ISTA are actually worth learning}; \textbf{(ii)} a systematic comparison of the training strategies for unfolded optimizers discussed in class (end-to-end, deep supervision, greedy layer-wise, weight tying); and \textbf{(iii)} a cross-dataset robustness study of all methods on real image data under compressed sensing.
 
 % ═════════════════════════════ 2. Problem formulation ═══════════════════════
 \section{Problem Formulation}
@@ -99,7 +99,7 @@ where $\st_{\theta}(v) = \operatorname{sign}(v)\max(|v|-\theta, 0)$ is the soft-
 
 \paragraph{Tasks and metrics.}
 \emph{Part A (synthetic):} $m=250$, $n=500$, $s=50$, Gaussian $A$, noiseless measurements; 51{,}200 training, 2{,}048 validation and 2{,}048 test signals with $\mathcal N(0,1)$ non-zeros on random supports. Performance is measured by normalized MSE in dB, $\mathrm{NMSE} = 10\log_{10}\, \mathbb E\!\left[ \norm{\hat x - x^*}_2^2 / \norm{x^*}_2^2 \right]$.
-\emph{Part B (images):} pixel-domain compressed sensing of MNIST and Fashion-MNIST: the image is flattened to $x\in[0,1]^{784}$ and measured as $b = Ax$ with measurement ratio $m/784 \in \{0.25, 0.5\}$. Both datasets are naturally sparse in the pixel domain (MNIST $\approx 78\%$, Fashion-MNIST $\approx 51.5\%$ exact zeros), so no transform is needed. Metrics: NMSE, PSNR and SSIM. Benchmarks in both parts: ISTA and FISTA (classical), LISTA (fully learned), ALISTA and HyperLISTA (structured).
+\emph{Part B (images):} pixel-domain compressed sensing of the MNIST and Fashion-MNIST datasets ($28\times28$ grayscale images; 60{,}000 training / 10{,}000 test images each, of which 5{,}000 training images are held out for validation): the image is flattened to $x\in[0,1]^{784}$ and measured as $b = Ax$ with measurement ratio $m/784 \in \{0.25, 0.5\}$. Both datasets are naturally sparse in the pixel domain (MNIST $\approx 78\%$, Fashion-MNIST $\approx 51.5\%$ exact zeros), so no sparsifying transform is needed. Metrics: NMSE, PSNR and SSIM. Benchmarks in both parts: ISTA and FISTA (classical), LISTA (fully learned), ALISTA and HyperLISTA (structured).
 
 % ═════════════════════════════ 3. Method ════════════════════════════════════
 \section{Method}
@@ -175,9 +175,9 @@ Method & NMSE [dB] & \#Params & Comment\\
 \midrule
 ISTA & $-5.3$ & 0 & classical baseline\\
 FISTA & $-11.0$ & 0 & + Nesterov momentum\\
-ThresholdISTA (ours) & $-7.1$ & 16 & thresholds alone barely help\\
-StepISTA (ours) & $-20.0$ & 16 & matches full LISTA\\
-StepThresholdISTA (ours) & $-23.6$ & 32 & beats LISTA, $187{,}000\times$ fewer params\\
+\textbf{ThresholdISTA (ours)} & $-7.1$ & \textbf{16} & thresholds alone barely help\\
+\textbf{StepISTA (ours)} & $-20.0$ & \textbf{16} & matches full LISTA\\
+\textbf{StepThresholdISTA (ours)} & $\mathbf{-23.6}$ & \textbf{32} & beats LISTA, $187{,}000\times$ fewer params\\
 LISTA-L1 & $-20.3$ & 6{,}000{,}016 & fully learned matrices\\
 LISTA-L2 & $-21.9$ & 6{,}000{,}016 & best LISTA variant\\
 LISTA-L3 & $-16.6$ & 6{,}000{,}016 & greedy plateaus\\
@@ -246,11 +246,13 @@ Sweeping both datasets and both measurement ratios confirms the pattern: on MNIS
 \section{Discussion}
 \label{sec:discussion}
 
+\paragraph{Bottom line.} In practical terms, our experiments support three operating rules. (i) If the signal truly follows a known sparse model, use a HyperLISTA-style method: three tuned scalars, no gradient training, and the best accuracy by a wide margin. (ii) If the model holds but only a small depth budget is available, learning 16--32 scalars (step sizes, and secondarily thresholds) recovers LISTA-level accuracy at negligible parameter cost --- this is the regime of our StepISTA/StepThresholdISTA designs. (iii) If the signal model is uncertain --- e.g., real images --- prefer a flexible learned model such as LISTA with deep supervision, because model-based shortcuts fail abruptly, not gracefully, under mismatch.
+
 \paragraph{Structure wins when assumptions match.} On data that satisfies the Gaussian-sparse model, adding structure simultaneously removed parameters and improved accuracy, culminating in HyperLISTA's $-61.4$\,dB from 3 grid-searched scalars --- a $41$\,dB advantage over 6M learned parameters. This is the MBDL thesis in its purest form: when the model is right, learning should be confined to the few quantities the theory cannot fix.
 
 \paragraph{The step-size schedule is what matters.} Our ablation localizes the value of learning in unrolled ISTA: 16 learned step sizes recover essentially all of LISTA's gain, while 16 learned thresholds recover almost none. This offers practical guidance for designing unrolled networks under tight parameter budgets --- and explains \emph{why} ALISTA-style architectures work: they keep exactly the components (per-layer $\gamma_k, \theta_k$) that matter.
 
-\paragraph{Wrong prior is worse than no prior.} Part B is deliberately adversarial to the structured methods, and they fail as theory predicts. The practical lesson is not that HyperLISTA is fragile, but that its guarantees are conditional on the signal model; deploying a model-based method requires validating the model. A mismatch does not degrade performance gracefully by default --- an adaptive threshold calibrated to the wrong residual statistics actively deletes signal.
+\paragraph{Wrong prior is worse than no prior.} Part B is deliberately adversarial to the structured methods, and they fail as theory predicts. This is an empirical instance of a point emphasized in the course text \cite{shlezinger2023mbdl}: the statistical models underlying model-based methods are \emph{surrogate approximations} of the true data distribution, and such surrogates ``can be quite unfaithful to the true data'' --- e.g., a Gaussian prior permits negative values that image pixels never take. The practical lesson is not that HyperLISTA is fragile, but that its guarantees are conditional on the signal model; deploying a model-based method requires validating the model. A mismatch does not degrade performance gracefully by default --- an adaptive threshold calibrated to the wrong residual statistics actively deletes signal.
 
 \paragraph{Limitations.} (i) Both parts use a fixed sensing matrix for training and testing; generalization across matrices was not evaluated. (ii) The main comparison is noiseless; preliminary noisy experiments ($\mathrm{SNR}=20$\,dB) preserved the ranking of Part A with reduced margins, but a systematic multi-seed noise study remains future work. (iii) Our HyperLISTA uses batch-median aggregation for $\theta^{(k)}, p^{(k)}$ rather than fully per-sample rules, and its $c_3$ search range had to be widened for images (optimal $c_3\approx 0.01$--$0.17$, far below the synthetic-case range) --- itself evidence of the model mismatch. (iv) Single-seed results; error bars were not computed.
 
@@ -286,9 +288,9 @@ X.~Chen, J.~Liu, Z.~Wang, and W.~Yin,
 in \emph{Advances in Neural Information Processing Systems (NeurIPS)}, 2021.
 
 \bibitem{shlezinger2023mbdl}
-N.~Shlezinger, J.~Whang, Y.~C.~Eldar, and A.~G.~Dimakis,
+N.~Shlezinger and Y.~C.~Eldar,
 ``Model-based deep learning,''
-\emph{Proceedings of the IEEE}, vol.~111, no.~5, pp.~465--499, 2023.
+\emph{Foundations and Trends in Signal Processing}, vol.~17, no.~4, pp.~291--416, 2023.
 
 \bibitem{lecturenotes}
 N.~Shlezinger, \emph{Model-Based Deep Learning (361.2.2320) --- Lecture Notes 1--8},
