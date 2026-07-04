@@ -1,12 +1,15 @@
 """
 Fast ISTA (FISTA) — ISTA with Nesterov momentum.
 
-Update rule (Beck & Teboulle 2009):
-  y^{k+1} = x^k + t_k (x^k - x^{k-1})
-  x^{k+1} = S_{λ/L}( y^{k+1} + (1/L) A^T (b - A y^{k+1}) )
+Update rule (Beck & Teboulle 2009), with t_1 = 1:
+  x^{k}   = S_{λ/L}( y^k + (1/L) A^T (b - A y^k) )
   t_{k+1} = (1 + sqrt(1 + 4 t_k^2)) / 2
+  y^{k+1} = x^k + ((t_k - 1) / t_{k+1}) (x^k - x^{k-1})
 
-where the momentum coefficient is (t_{k-1} - 1) / t_k.
+t_k is an auxiliary momentum sequence (no physical meaning of its own):
+it starts at 1 and grows like ~k/2, so the momentum coefficient
+(t_k - 1)/t_{k+1} starts at 0 and approaches 1. This specific schedule
+is exactly what upgrades the O(1/k) rate of ISTA to O(1/k^2).
 """
 
 import torch
