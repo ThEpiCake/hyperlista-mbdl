@@ -1,4 +1,4 @@
-# HyperLISTA — Model-Based Deep Learning Project
+# Sparse Recovery and Compressed Sensing — A Model-Based Deep Learning Approach
 
 Final project for **Model-Based Deep Learning (361.2.2320)**, Ben-Gurion University, Spring 2025–2026.
 
@@ -8,12 +8,17 @@ Final project for **Model-Based Deep Learning (361.2.2320)**, Ben-Gurion Univers
 
 ## Project Overview
 
-We implement and evaluate **HyperLISTA** — an ultra-lightweight deep-unrolled network for sparse linear inverse problems — against four competing methods:
+We implement, evaluate, and extend **HyperLISTA** — an ultra-lightweight deep-unrolled network for sparse linear inverse problems. Beyond reproducing the paper, we design and evaluate three original ISTA-derived scalar models that explore the MBDL design space.
+
+Methods compared:
 
 | Method | Type | Learnable params |
 |--------|------|-----------------|
 | ISTA | Classical iterative | 0 |
 | FISTA | Classical + Nesterov momentum | 0 |
+| **ThresholdISTA** | **Our design — ISTA + learned $\theta_k$** | **K = 16** |
+| **StepISTA** | **Our design — ISTA + learned $\gamma_k$** | **K = 16** |
+| **StepThresholdISTA** | **Our design — ISTA + learned $\gamma_k, \theta_k$** | **2K = 32** |
 | LISTA | Deep-unrolled (Gregor & LeCun) | O(K · m · n) |
 | ALISTA | Analytic weights + learned scalars | O(K) |
 | **HyperLISTA** | **Analytic + 3 global hyperparams** | **3** |
@@ -21,7 +26,7 @@ We implement and evaluate **HyperLISTA** — an ultra-lightweight deep-unrolled 
 Evaluation covers two tasks:
 
 - **Part A:** Synthetic sparse vector recovery: $b = Ax^* + \varepsilon$
-- **Part B:** Compressed-sensing image reconstruction from Fashion-MNIST in the **pixel domain** (no DCT needed — FashionMNIST is ~65 % sparse in pixel space due to its dark background)
+- **Part B:** Compressed-sensing image reconstruction from Fashion-MNIST in the **pixel domain** (no DCT needed — FashionMNIST is ~51.5% sparse in pixel space due to its dark background)
 
 We also systematically compare three **training strategies for unfolded optimizers** (Lecture 6):
 
@@ -38,17 +43,26 @@ We also systematically compare three **training strategies for unfolded optimize
 ```
 hyperlista_mbdl_project/
 ├── notebooks/
-│   ├── 01_sparse_recovery_baselines.ipynb          # ISTA & FISTA sweeps
-│   ├── 02_lista_alista_hyperlista.ipynb             # Trained models, full comparison
-│   ├── 03_sparse_generalization_experiments.ipynb   # OOD tests (noise, sparsity, sensing matrix)
-│   ├── 04_image_cs_experiments.ipynb               # Fashion-MNIST CS via 2D-DCT (Part B)
-│   ├── 05_training_methods_comparison.ipynb         # L1 / L2 / L3 × {LISTA, LISTA-Tied}
-│   └── 06_fashion_mnist_pixel_domain.ipynb          # Fashion-MNIST pixel-domain CS (no DCT)
+│   ├── 01_sparse_recovery_baselines.ipynb      # ISTA & FISTA sweeps (Part A baselines)
+│   ├── 02_lista_alista_hyperlista.ipynb         # LISTA / ALISTA / HyperLISTA, full comparison
+│   ├── 03_ista_unfolding_design_space.ipynb     # Our three scalar models + L1/L2/L3 comparison
+│   ├── 04_real_image_pixel_domain.ipynb         # MNIST/FashionMNIST pixel-domain CS (Part B)
+│   └── archive/                                 # Older exploratory notebooks (DCT-domain CS etc.)
+│
+├── presentation/
+│   ├── MBDL_Seminar_Final.pptx                  # Recorded-seminar slides (16 slides, EN)
+│   ├── MBDL_Seminar_Final.pdf                   # Same deck, PDF export
+│   ├── SPEAKER_SCRIPT.md                        # Per-slide narration script (HE, ~15 min)
+│   └── build_pptx.py                            # Deterministic deck builder (python-pptx)
+│
+├── report/
+│   ├── report.tex                               # Final report (LaTeX, course format)
+│   └── report.pdf                               # Compiled report
 │
 ├── src/
 │   ├── data/
 │   │   ├── sparse_generator.py   # Synthetic sparse dataset
-│   │   └── image_loader.py       # Fashion-MNIST CS (DCT & pixel-domain loaders)
+│   │   └── image_loader.py       # Fashion-MNIST pixel-domain CS loader
 │   ├── operators/
 │   │   └── dct_operators.py      # Separable 2D-DCT / IDCT
 │   ├── models/
@@ -56,7 +70,8 @@ hyperlista_mbdl_project/
 │   │   ├── fista.py              # FISTA with Nesterov momentum
 │   │   ├── lista.py              # LISTA — independent or tied weights (tied=True)
 │   │   ├── alista.py             # ALISTA (analytic W, learned γ, θ)
-│   │   └── hyperlista.py         # HyperLISTA (3 hyperparams only)
+│   │   ├── hyperlista.py         # HyperLISTA (3 hyperparams only)
+│   │   └── learned_ista.py       # Our models: ThresholdISTA, StepISTA, StepThresholdISTA
 │   ├── training/
 │   │   ├── trainer.py            # BPTT (L1/L2) + sequential greedy (L3) training
 │   │   └── tuner.py              # Gradient-free grid search for HyperLISTA
@@ -65,7 +80,7 @@ hyperlista_mbdl_project/
 │       └── visualizer.py         # NMSE-vs-layers, image grids, landscapes
 │
 ├── results/
-│   └── checkpoints/              # HyperLISTA hyperparameter JSONs (*.json)
+│   └── checkpoints/              # Saved model weights and HyperLISTA JSON files
 │
 ├── requirements.txt
 └── README.md
@@ -196,36 +211,31 @@ hyperlista_mbdl_project/
 
 ## Quick Start
 
-### Part A — Sparse recovery
+### Part A — Sparse recovery baselines
 
 ```bash
 cd notebooks
-jupyter notebook 01_sparse_recovery_baselines.ipynb   # classical baselines
-jupyter notebook 02_lista_alista_hyperlista.ipynb      # all five methods
-jupyter notebook 03_sparse_generalization_experiments.ipynb  # OOD tests
+jupyter notebook 01_sparse_recovery_baselines.ipynb   # ISTA & FISTA
+jupyter notebook 02_lista_alista_hyperlista.ipynb      # LISTA, ALISTA, HyperLISTA
 ```
 
-### Training Methods Comparison (Part A extension)
+### Design space & training methods (Notebook 03)
 
 ```bash
-jupyter notebook 05_training_methods_comparison.ipynb
+jupyter notebook 03_ista_unfolding_design_space.ipynb
 ```
 
-Compares L1 / L2 / L3 training strategies × {LISTA, LISTA-Tied}, with ALISTA and HyperLISTA as structural-prior references.
+Contains two experiments:
+1. **ISTA component ablation** — ThresholdISTA, StepISTA, StepThresholdISTA
+2. **Training method comparison** — L1 / L2 / L3 × {LISTA, LISTA-Tied}
 
-### Part B — Image CS (DCT domain)
+### Part B — Image CS (Pixel domain)
 
 ```bash
-jupyter notebook 04_image_cs_experiments.ipynb
+jupyter notebook 04_real_image_pixel_domain.ipynb
 ```
 
-### Part B — Image CS (Pixel domain, per professor feedback)
-
-```bash
-jupyter notebook 06_fashion_mnist_pixel_domain.ipynb
-```
-
-FashionMNIST data is downloaded automatically to `./data/`. Both Part B notebooks share the same dataset.
+FashionMNIST data is downloaded automatically to `./data/`.
 
 ---
 
@@ -237,8 +247,8 @@ PyTorch uses different random-number generators for CPU (Mersenne Twister) and G
 
 HyperLISTA is unaffected: its three scalars (c1, c2, c3) are dimensionless ratios, and W is recomputed analytically from whatever A you provide.
 
-**Fix applied (Sessions 3+):**
-- Notebooks 05 and 06 now save `A_partA.npy` / `A_pixel_<ratio>.npy` (tracked by Git, gitignore has `!results/checkpoints/A_*.npy`).
+**Fix applied:**
+- Notebooks 02 and 04 save `A_partA.npy` / `A_pixel_<ratio>.npy` (tracked by Git, gitignore has `!results/checkpoints/A_*.npy`).
 - To reload a LISTA/ALISTA checkpoint on CPU:
 
 ```python
@@ -251,25 +261,37 @@ lista.load_state_dict(torch.load('results/checkpoints/lista_L1.pt', map_location
 
 ## Key Findings
 
-### Part A — Training Methods (Notebook 05)
+### Part A — ISTA Component Ablation (Notebook 03)
 
 | Method | NMSE @ K=16 | # Params | Observation |
 |--------|------------|---------|-------------|
-| LISTA-L1 | -12.6 dB | 6,000,016 | Baseline |
-| LISTA-L2 | -13.4 dB | 6,000,016 | +0.8 dB from deep supervision |
-| LISTA-L3 | -12.1 dB | 6,000,016 | Greedy plateaus after layer 5 |
-| **LISTA-Tied-L1** | **-17.1 dB** | 375,001 | Beats independent LISTA |
-| LISTA-Tied-L2 | -16.7 dB | 375,001 | – |
-| ALISTA | -30.0 dB | 32 | Reference |
-| HyperLISTA | -54.1 dB | 3 | Reference |
+| ISTA | -5.3 dB | 0 | Baseline |
+| FISTA | -11.0 dB | 0 | Momentum helps |
+| ThresholdISTA | -7.1 dB | 16 | Learning θ alone barely helps |
+| StepISTA | -20.0 dB | 16 | Learning γ alone ≈ full LISTA |
+| **StepThresholdISTA** | **-23.6 dB** | **32** | **Beats LISTA with 187,000× fewer params** |
+| LISTA-L1 | -20.3 dB | 6,000,016 | Reference |
 
-**Notable: LISTA-Tied outperforms LISTA-Independent** by ~4.5 dB despite 16× fewer parameters.
+**Key insight:** The step size schedule is the most valuable component to learn. `StepISTA` (16 scalars) matches `LISTA` (6M parameters). Decoupling the threshold from the step size adds another 3 dB at zero cost. This is the MBDL principle: structured scalar models beat unstructured matrix learners.
 
-*Why?* LISTA with 6M independent parameters has a complex, poorly-conditioned loss landscape. The RNN-style weight tying acts as implicit regularization: all layers must share a single (W_y, W_x, θ), which makes gradient flow smoother and convergence more reliable. This is a concrete example of the MBDL principle: adding structure (even the mild constraint of weight sharing) improves both efficiency and performance.
+### Part A — Training Methods (Notebook 03)
 
-**L3 observation:** NMSE-vs-layer flattens from layer 5 onward (all log at -12.1 dB). Greedy training optimizes each step independently, so later layers have no incentive to improve over what earlier layers already solved.
+| Method | NMSE @ K=16 | # Params | Observation |
+|--------|------------|---------|-------------|
+| LISTA-L1 | -20.3 dB | 6,000,016 | Baseline (end-to-end BPTT) |
+| **LISTA-L2** | **-21.9 dB** | 6,000,016 | Deep supervision — best LISTA variant |
+| LISTA-L3 | -16.6 dB | 6,000,016 | Greedy training plateaus (~layer 8) |
+| LISTA-Tied-L1 | -19.1 dB | 375,001 | Near-untied accuracy, 16× fewer params |
+| ALISTA | -29.8 dB | 32 | Reference |
+| HyperLISTA | -61.4 dB | 3 | Reference |
 
-### Part B — FashionMNIST Pixel Domain (Notebook 06)
+**Notable: LISTA-Tied nearly matches LISTA-Independent** (−19.1 vs −20.3 dB) despite 16× fewer parameters.
+
+*Why?* LISTA with 6M independent parameters has a complex, poorly-conditioned loss landscape. The RNN-style weight tying acts as implicit regularization: all layers must share a single (W_y, W_x, θ), which makes gradient flow smoother and convergence more reliable. This is a concrete example of the MBDL principle: adding structure (even the mild constraint of weight sharing) preserves accuracy at a fraction of the parameter cost.
+
+**L3 observation:** NMSE-vs-layer flattens from ~layer 8 onward. Greedy training optimizes each step independently, so later layers have no incentive to improve over what earlier layers already solved.
+
+### Part B — FashionMNIST Pixel Domain (Notebook 04)
 
 | Method | NMSE (ratio=0.25) | PSNR | SSIM |
 |--------|------------------|------|------|
@@ -306,15 +328,12 @@ $$\theta^{(k)} = c_1 \mu \|A^+(Ax^{(k)}-b)\|_1, \quad \beta^{(k)} = c_2 \mu \|x^
 
 The weight matrix $W = (G^TG)A$ is computed analytically (symmetric Jacobian parameterisation).
 
-### DCT-domain CS (Notebook 04)
-$$y = A\alpha + n = A\Psi x + n, \quad \hat{x} = \Psi^T \hat{\alpha}$$
+### Pixel-domain CS (Notebook 04)
+$$b = Ax + n, \quad x \in [0,1]^{784} \text{ (≈51.5\% exact zeros in pixel space)}$$
 
-### Pixel-domain CS (Notebook 06)
-$$b = Ax + n, \quad x \in [0,1]^{784} \text{ (≈65\% sparse in pixel space)}$$
+FashionMNIST images have a black background, making pixel vectors naturally sparse — no frequency transform is required. (A DCT-domain variant $y = A\Psi x + n$ is kept in `notebooks/archive/`.)
 
-FashionMNIST images have a black background, making pixel vectors naturally sparse — no frequency transform is required.
-
-### Training strategies (Notebook 05)
+### Training strategies (Notebook 03)
 
 | Loss | Definition |
 |------|-----------|

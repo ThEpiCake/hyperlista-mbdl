@@ -3,11 +3,12 @@
 *.csv
 *.npy
 *.npz
-# Allow sensing-matrix snapshots (needed to reload checkpoints on CPU)
 *.pt
 *.pth
 *.pkl
 *.json
+# Allow sensing-matrix snapshots (needed to reload checkpoints on CPU)
+!results/checkpoints/A_*.npy
 
 # ── Python ───────────────────────────────────────────────
 __pycache__/
