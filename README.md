@@ -1,6 +1,9 @@
 # Sparse Recovery and Compressed Sensing — A Model-Based Deep Learning Approach
 
-Final project for **Model-Based Deep Learning (361.2.2320)**, Ben-Gurion University, Spring 2025–2026.
+Final project for **Model-Based Deep Learning (361.2.2320)**, Ben-Gurion University, Spring 2026.
+**Team:** Etay Baron & Etai Wigman
+
+> 📦 **Final deliverables (report + seminar presentation) are in [`submission/`](submission/).**
 
 > **Reference:** Chen, Liu, Wang, Yin. *Hyperparameter Tuning is All You Need for LISTA*. NeurIPS 2021.
 
