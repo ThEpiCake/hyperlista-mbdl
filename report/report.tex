@@ -63,7 +63,7 @@ We study deep unrolling of ISTA for sparse recovery across the full spectrum of 
 \section{Motivation and Background}
 \label{sec:motivation}
 
-Many acquisition systems observe a signal only through a small number of linear measurements: accelerated MRI samples a fraction of k-space, radar receives compressed snapshots, and single-pixel cameras record random projections. Recovering the underlying signal from such incomplete data is an ill-posed linear inverse problem --- infinitely many signals explain the same measurements. \emph{Compressed sensing} resolves this ambiguity with a structural prior: natural signals are (approximately) \emph{sparse} in a suitable domain, i.e., only $s \ll n$ of their coefficients are significant \cite{beck2009fista}.
+Many acquisition systems observe a signal only through a small number of linear measurements: accelerated MRI samples a fraction of k-space, radar receives compressed snapshots, and single-pixel cameras record random projections. Recovering the underlying signal from such incomplete data is an ill-posed linear inverse problem --- infinitely many signals explain the same measurements. \emph{Compressed sensing} resolves this ambiguity with a structural prior: natural signals are (approximately) \emph{sparse} in a suitable domain, i.e., only $s \ll n$ of their coefficients are significant \cite{donoho2006cs}.
 
 Classical sparse-recovery algorithms such as ISTA and FISTA \cite{beck2009fista} solve a convex relaxation of the problem with provable convergence, and they are fully interpretable --- but they may require hundreds of iterations to reach useful accuracy. Deep neural networks, at the other extreme, produce excellent reconstructions in a fixed (small) number of layers, but discard the known measurement model and require large amounts of data.
 
@@ -149,7 +149,7 @@ All parameters are softplus-reparameterized to remain positive and initialized a
 
 \subsection{Training strategies for unfolded optimizers}
 
-Following the strategies discussed in class for training unfolded optimizers, we compare, for a fixed LISTA architecture:
+Following the strategies discussed in class for training unfolded optimizers \cite{lecturenotes}, we compare, for a fixed LISTA architecture:
 \begin{itemize}\itemsep2pt
   \item \textbf{L1 --- end-to-end:} $\mathcal L = \norm{x^{(K)} - x^*}^2$, standard BPTT through all $K$ layers;
   \item \textbf{L2 --- deep supervision:} $\mathcal L = \norm{x^{(K)} - x^*}^2 + \lambda_{\mathrm{int}} \sum_k w_k \norm{x^{(k)} - x^*}^2$ with log-scaled layer weights $w_k$;
@@ -277,6 +277,11 @@ Sweeping both datasets and both measurement ratios confirms the pattern (Figure~
 \begin{thebibliography}{9}
 \setlength{\itemsep}{2pt}
 
+\bibitem{donoho2006cs}
+D.~L.~Donoho,
+``Compressed sensing,''
+\emph{IEEE Transactions on Information Theory}, vol.~52, no.~4, pp.~1289--1306, 2006.
+
 \bibitem{beck2009fista}
 A.~Beck and M.~Teboulle,
 ``A fast iterative shrinkage-thresholding algorithm for linear inverse problems,''
@@ -285,7 +290,7 @@ A.~Beck and M.~Teboulle,
 \bibitem{gregor2010lista}
 K.~Gregor and Y.~LeCun,
 ``Learning fast approximations of sparse coding,''
-in \emph{Proc.\ 27th International Conference on Machine Learning (ICML)}, 2010.
+in \emph{Proc.\ 27th International Conference on Machine Learning (ICML)}, pp.~399--406, 2010.
 
 \bibitem{chen2018lista}
 X.~Chen, J.~Liu, Z.~Wang, and W.~Yin,
