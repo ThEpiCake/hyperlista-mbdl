@@ -29,7 +29,7 @@ Methods compared:
 Evaluation covers two tasks:
 
 - **Part A:** Synthetic sparse vector recovery: $b = Ax^* + \varepsilon$
-- **Part B:** Compressed-sensing image reconstruction from Fashion-MNIST in the **pixel domain** (no DCT needed — FashionMNIST is ~51.5% sparse in pixel space due to its dark background)
+- **Part B:** Compressed-sensing image reconstruction from MNIST/Fashion-MNIST, first in the **pixel domain** (notebook 04; FashionMNIST is ~51.5% near-zero in pixel space) and then revisited in the **DCT transform domain** (notebook 05; same measurements, recovery via the effective dictionary $D = A\Psi^\top$)
 
 We also systematically compare three **training strategies for unfolded optimizers** (Lecture 6):
 
@@ -54,12 +54,13 @@ hyperlista_mbdl_project/
 │   ├── 01_sparse_recovery_baselines.ipynb      # ISTA & FISTA sweeps (Part A baselines)
 │   ├── 02_lista_alista_hyperlista.ipynb         # LISTA / ALISTA / HyperLISTA, full comparison
 │   ├── 03_ista_unfolding_design_space.ipynb     # Our three scalar models + L1/L2/L3 comparison
-│   └── 04_real_image_pixel_domain.ipynb         # MNIST/FashionMNIST pixel-domain CS (Part B)
+│   ├── 04_real_image_pixel_domain.ipynb         # MNIST/FashionMNIST pixel-domain CS (Part B)
+│   └── 05_transform_domain.ipynb                # DCT-domain CS via D = A·Psi^T (Part B follow-up)
 │
 ├── src/
 │   ├── data/
 │   │   ├── sparse_generator.py   # Synthetic sparse dataset
-│   │   └── image_loader.py       # Fashion-MNIST pixel-domain CS loader
+│   │   └── image_loader.py       # MNIST/FashionMNIST CS loaders (pixel + DCT domain)
 │   ├── operators/
 │   │   └── dct_operators.py      # Separable 2D-DCT / IDCT
 │   ├── models/
@@ -123,31 +124,41 @@ A, train_loader, val_loader, test_loader = build_sparse_dataloaders(
 
 No download needed — generated on first run.
 
-### Data for Part B (Fashion-MNIST Compressed Sensing)
+### Data for Part B (MNIST / Fashion-MNIST Compressed Sensing)
 
 **Downloaded automatically via PyTorch.**
 
-When you run notebook 04, the code fetches Fashion-MNIST:
+Notebook 04 (pixel domain) uses:
 
 ```python
-A_r, Psi, tr_loader, te_loader = build_image_cs_dataloaders(
-    measurement_ratio=0.25,  # m/d ∈ {0.125, 0.25, 0.5}
-    sigma=0.0,
-    batch_size=128,
-    device=DEVICE,
-    data_root='./data',
+A, train_loader, val_loader, test_loader = build_pixel_cs_dataloaders(
+    dataset_name='fashionmnist',   # or 'mnist'
+    measurement_ratio=0.25,        # m/d ∈ {0.25, 0.5}
+    sigma=0.0, batch_size=256, n_val=5000,
+    device=DEVICE, data_root='./data',
 )
 ```
 
-- **Downloaded to:** `./data/` (auto-created on first run)
-- **Storage:** ~30 MB (train) + ~5 MB (test) per ratio
-- **Format:** Grayscale 28×28 images, automatically converted to 2D-DCT coefficients
+Notebook 05 (DCT domain) uses the same physical measurements `y = A x` but
+returns the effective dictionary `D = A @ Psi.T` and `(y, alpha, x)` triplets:
 
-If you run the project without internet access, download Fashion-MNIST once in
-an online environment and copy the resulting `data/FashionMNIST/` directory into
-the project. The loader intentionally fails with an explicit offline-data message
-instead of substituting synthetic images, because Part B is meant to evaluate the
-real Fashion-MNIST reconstruction task.
+```python
+A, D, Psi, train_loader, val_loader, test_loader = build_transform_cs_dataloaders(
+    dataset_name='fashionmnist',   # or 'mnist'
+    measurement_ratio=0.25,
+    sigma=0.0, batch_size=256, n_val=5000,
+    device=DEVICE, data_root='./data',
+)
+```
+
+- **Downloaded to:** `./data/` (auto-created on first run; MNIST and FashionMNIST are each ~12–35 MB)
+- **Format:** Grayscale 28×28 images in [0,1], flattened to d = 784
+
+If you run the project without internet access, download the datasets once in
+an online environment and copy the resulting `data/MNIST/` and/or
+`data/FashionMNIST/` directories into the project. The loader intentionally
+fails with an explicit offline-data message instead of substituting synthetic
+images, because Part B is meant to evaluate the real reconstruction task.
 
 ### Expected Directory Structure (After First Run)
 
@@ -234,6 +245,16 @@ jupyter notebook 04_real_image_pixel_domain.ipynb
 
 FashionMNIST data is downloaded automatically to `./data/`.
 
+### Part B follow-up — Image CS (DCT transform domain)
+
+```bash
+jupyter notebook 05_transform_domain.ipynb
+```
+
+Same measurements as notebook 04, recovery in the DCT domain. Set
+`DATASET_NAME` / `MEASUREMENT_RATIO` in the config cell to reproduce each of
+the four {mnist, fashionmnist} × {0.25, 0.5} cells.
+
 ---
 
 ## Reproducibility Note — CPU vs GPU Sensing Matrix
@@ -292,11 +313,12 @@ lista.load_state_dict(torch.load('results/checkpoints/lista_L1.pt', map_location
 
 | Method | NMSE (ratio=0.25) | PSNR | SSIM |
 |--------|------------------|------|------|
-| ISTA | -1.9 dB | 8.8 | 0.134 |
-| FISTA | -1.8 dB | 8.7 | 0.135 |
-| **LISTA** | **-14.6 dB** | **23.2** | **0.863** |
-| ALISTA | -1.6 dB | 8.4 | 0.128 |
-| HyperLISTA | -0.9 dB | 7.7 | 0.091 |
+| ISTA | -1.2 dB | 8.9 | 0.133 |
+| FISTA | -1.2 dB | 8.9 | 0.135 |
+| StepThresholdISTA | -1.2 dB | 8.9 | 0.133 |
+| **LISTA-L2** | **-13.7 dB** | **22.3** | **0.817** |
+| ALISTA | -0.9 dB | 8.4 | 0.124 |
+| HyperLISTA | -0.3 dB | 7.7 | 0.085 |
 
 **ALISTA and HyperLISTA fail here — and this is expected.**
 
@@ -308,6 +330,34 @@ The reason is a signal-model mismatch:
 - For HyperLISTA, the original tuner c3_range=(0.5, 30) was too narrow: optimal c3 ≈ 0.01–0.17 (below the grid's lower bound). Fixed in Session 3 to c3_range=(0.01, 5.0).
 
 **Interpretation for the report:** This is not a bug — it demonstrates a key MBDL lesson: *wrong prior (Gaussian sparse) is worse than no prior at all (LISTA)*. LISTA wins here because it is data-driven and learns the actual image distribution from 51K training images. This motivates the design of HyperLISTA extensions that account for bounded non-negative signals.
+
+### Part B follow-up — DCT Transform Domain (Notebook 05)
+
+Same measurements `y = A x` as notebook 04 (bit-identical A and splits), but recovery
+happens in the DCT domain via the effective dictionary `D = A @ Psi.T`; the image is
+reconstructed as `x_hat = Psi.T @ alpha_hat`. SSIM across all four cells (pixel → DCT):
+
+| Cell | ISTA | FISTA | StepThr | LISTA-L2 | ALISTA | HyperLISTA |
+|------|------|-------|---------|----------|--------|------------|
+| FMNIST @ 0.25 | 0.13 → **0.26** | 0.13 → **0.35** | 0.13 → **0.52** | 0.82 → 0.81 | 0.12 → **0.40** | 0.08 → **0.52** |
+| FMNIST @ 0.5 | 0.30 → **0.45** | 0.33 → **0.57** | 0.33 → **0.68** | 0.88 → 0.82 | 0.31 → **0.69** | 0.34 → **0.71** |
+| MNIST @ 0.25 | 0.18 → **0.22** | 0.21 → **0.31** | 0.22 → **0.43** | 0.98 → 0.88 | 0.23 → **0.37** | 0.23 → **0.43** |
+| MNIST @ 0.5 | 0.43 → 0.45 | 0.59 → 0.57 | 0.74 → 0.65 | 0.99 → 0.85 | 0.82 → 0.66 | 0.81 → 0.66 |
+
+**Two-sided conclusion:**
+
+1. **The Fashion-MNIST collapse was a domain problem, not an algorithm problem.**
+   On FMNIST @ 0.25 HyperLISTA jumps from dead last (−0.27 dB, SSIM 0.085) to
+   −7.7 dB / SSIM 0.52 with the same 3 scalars, and its tuned `c3` returns to a
+   healthy support-selection range (2.5–15.8 vs 0.17 in pixel space). At ratio 0.5
+   HyperLISTA is the **best** structured method (−11.4 dB, SSIM 0.71).
+2. **The transform is not a free lunch.** On MNIST @ 0.5 — where pixels already form
+   a good sparse domain (~78% exact zeros) — the DCT actually *hurts* the structured
+   learners (ALISTA 0.82 → 0.66). Sparse recovery succeeds in whichever domain the
+   signal is genuinely sparsest; the domain choice is part of the model.
+3. **LISTA-L2 stays the robust ceiling** (SSIM 0.81–0.88 everywhere), but on
+   FMNIST @ 0.25 its NMSE lead over the best structured method shrinks from 12.5 dB
+   to 7.1 dB once the prior matches the data.
 
 ---
 

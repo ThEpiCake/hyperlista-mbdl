@@ -181,6 +181,11 @@ def build_image_cs_dataloaders(
     """
     Build train / test DataLoaders for Fashion-MNIST compressed sensing.
 
+    DEPRECATED: this loader senses the DCT coefficients directly (y = A alpha)
+    and has no validation split. Use build_transform_cs_dataloaders instead,
+    which keeps the physical pixel measurements y = A x and recovers alpha
+    through the effective dictionary D = A Psi^T.
+
     Args:
         measurement_ratio: m / d, e.g. 0.125, 0.25, or 0.5
         sigma:             Additive Gaussian noise std-dev on measurements
@@ -340,3 +345,129 @@ def build_pixel_cs_dataloaders(
     )
 
     return A, train_loader, val_loader, test_loader
+
+
+def build_transform_cs_dataloaders(
+    measurement_ratio: float = 0.25,
+    sigma: float = 0.0,
+    batch_size: int = 128,
+    data_root: str = "./data",
+    device: torch.device = None,
+    seed: int = 42,
+    n_val: int = 5000,
+    dataset_name: str = "fashionmnist",
+):
+    """
+    Build train / validation / test DataLoaders for MNIST/FashionMNIST
+    transform-domain (2D-DCT) compressed sensing.
+
+    The measurement model is the *physical* pixel one, identical to
+    build_pixel_cs_dataloaders (same RNG call order => bit-identical A and
+    measurements for a given seed/device):
+
+        y = A x + noise,        x in [0,1]^784
+
+    Recovery happens in the DCT domain through the effective dictionary
+
+        alpha = DCT2(x),  D = A Psi^T   =>   y = D alpha,
+        x_hat = Psi^T alpha_hat = idct2_flat(alpha_hat).
+
+    D's columns are NOT renormalised: because Psi is orthonormal,
+    ||D||_2 = ||A||_2 exactly and the column norms stay ~1, so every model's
+    spectral-norm-based step size remains correct and idct2_flat inverts
+    alpha_hat without any per-column rescaling.
+
+    Args:
+        measurement_ratio: m / d, where d = 784
+        sigma:             Additive Gaussian noise std-dev on measurements
+        batch_size:        Mini-batch size
+        data_root:         Where to cache the raw dataset
+        device:            Torch device
+        seed:              RNG seed for sensing matrix, split, and noise
+        n_val:             Number of validation samples taken from the training split
+        dataset_name:      "mnist" or "fashionmnist"
+
+    Returns:
+        A:            Sensing matrix (m, d) on device
+        D:            Effective dictionary A @ Psi.T (m, d) — pass this to models
+        Psi:          Full orthonormal 2D-DCT basis (d, d)
+        train_loader: DataLoader yielding (y, alpha, x_flat)
+        val_loader:   DataLoader yielding (y, alpha, x_flat)
+        test_loader:  DataLoader yielding (y, alpha, x_flat)
+    """
+    if device is None:
+        device = torch.device("cpu")
+
+    torch.manual_seed(seed)
+
+    d = 784
+    m = int(measurement_ratio * d)
+
+    if not 0.0 < measurement_ratio <= 1.0:
+        raise ValueError("measurement_ratio must be in (0, 1].")
+
+    A = torch.randn(m, d, device=device)
+    A = A / A.norm(dim=0, keepdim=True)
+
+    train_full = _load_raw_image_dataset(
+        data_root=data_root,
+        train=True,
+        dataset_name=dataset_name,
+    )
+    test_flat = _load_raw_image_dataset(
+        data_root=data_root,
+        train=False,
+        dataset_name=dataset_name,
+    )
+
+    if not 0 <= n_val < train_full.shape[0]:
+        raise ValueError(
+            f"n_val must be in [0, {train_full.shape[0] - 1}], got {n_val}."
+        )
+
+    generator = torch.Generator().manual_seed(seed)
+    perm = torch.randperm(train_full.shape[0], generator=generator)
+
+    val_idx = perm[:n_val]
+    train_idx = perm[n_val:]
+
+    train_flat = train_full[train_idx]
+    val_flat = train_full[val_idx]
+
+    Psi = get_dct_basis(28, 28, device=device)   # (784, 784), orthonormal
+    D = A @ Psi.T                                 # effective dictionary (m, d)
+
+    def _make(imgs_flat: torch.Tensor) -> CSImageDataset:
+        imgs_flat = imgs_flat.to(device)
+        alpha = dct2_flat(imgs_flat)              # (N, d) DCT coefficients
+        y = imgs_flat @ A.T                       # physical measurements y = A x
+
+        if sigma > 0:
+            y = y + sigma * torch.randn_like(y)
+
+        return CSImageDataset(imgs_flat, alpha, y, A)
+
+    train_ds = _make(train_flat)
+    val_ds = _make(val_flat)
+    test_ds = _make(test_flat)
+
+    train_loader = DataLoader(
+        train_ds,
+        batch_size=batch_size,
+        shuffle=True,
+        pin_memory=False,
+    )
+    val_loader = DataLoader(
+        val_ds,
+        batch_size=batch_size,
+        shuffle=False,
+        pin_memory=False,
+    )
+    test_loader = DataLoader(
+        test_ds,
+        batch_size=batch_size,
+        shuffle=False,
+        pin_memory=False,
+    )
+
+    return A, D, Psi, train_loader, val_loader, test_loader

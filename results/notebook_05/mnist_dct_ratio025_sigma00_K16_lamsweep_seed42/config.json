@@ -1,0 +1,28 @@
+{
+  "dataset_name": "mnist",
+  "domain": "dct",
+  "measurement_ratio": 0.25,
+  "sigma": 0.0,
+  "batch_size": 256,
+  "n_val": 5000,
+  "K": 16,
+  "initial_lambda": 0.01,
+  "lambda": 0.3,
+  "seed": 42,
+  "run_alista": true,
+  "run_hyperlista": true,
+  "selected_lambda": 0.3,
+  "lambda_grid": [
+    0.001,
+    0.003,
+    0.01,
+    0.03,
+    0.1,
+    0.3,
+    1.0,
+    3.0,
+    10.0,
+    30.0
+  ],
+  "lambda_selection": "best FISTA validation NMSE over LAMBDA_GRID"
+}
