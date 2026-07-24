@@ -1,0 +1,9 @@
+,nmse_db,nmse_db,ssim,ssim
+,mean,std,mean,std
+model,,,,
+ALISTA,-5.11,0.125,0.397,0.008
+FISTA,-6.429,0.28,0.406,0.008
+HyperLISTA,-7.631,0.219,0.516,0.011
+ISTA,-3.953,0.339,0.262,0.013
+LISTA-L2,-13.966,0.83,0.783,0.025
+StepThresholdISTA,-7.623,0.109,0.508,0.003
