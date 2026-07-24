@@ -29,7 +29,7 @@ Methods compared:
 Evaluation covers two tasks:
 
 - **Part A:** Synthetic sparse vector recovery: $b = Ax^* + \varepsilon$
-- **Part B:** Compressed-sensing image reconstruction from MNIST/Fashion-MNIST, first in the **pixel domain** (notebook 04; FashionMNIST is ~51.5% near-zero in pixel space) and then revisited in the **DCT transform domain** (notebook 05; same measurements, recovery via the effective dictionary $D = A\Psi^\top$)
+- **Part B:** Compressed-sensing image reconstruction from MNIST/Fashion-MNIST, first in the **pixel domain** (notebook 04; FashionMNIST is ~50% near-zero in pixel space) and then revisited in the **DCT transform domain** (notebook 05; same measurements, recovery via the effective dictionary $D = A\Psi^\top$)
 
 We also systematically compare three **training strategies for unfolded optimizers** (Lecture 6):
 
@@ -313,21 +313,21 @@ lista.load_state_dict(torch.load('results/checkpoints/lista_L1.pt', map_location
 
 | Method | NMSE (ratio=0.25) | PSNR | SSIM |
 |--------|------------------|------|------|
-| ISTA | -1.2 dB | 8.9 | 0.133 |
-| FISTA | -1.2 dB | 8.9 | 0.135 |
-| StepThresholdISTA | -1.2 dB | 8.9 | 0.133 |
-| **LISTA-L2** | **-13.7 dB** | **22.3** | **0.817** |
-| ALISTA | -0.9 dB | 8.4 | 0.124 |
-| HyperLISTA | -0.3 dB | 7.7 | 0.085 |
+| ISTA | -1.1 dB | 8.8 | 0.134 |
+| FISTA | -1.1 dB | 8.7 | 0.135 |
+| StepThresholdISTA | -1.1 dB | 8.8 | 0.137 |
+| **LISTA-L2** | **-14.1 dB** | **22.5** | **0.828** |
+| ALISTA | -0.8 dB | 8.4 | 0.128 |
+| HyperLISTA | -0.3 dB | 7.7 | 0.091 |
 
 **ALISTA and HyperLISTA fail here — and this is expected.**
 
 The reason is a signal-model mismatch:
 
 - ALISTA and HyperLISTA were **designed for i.i.d. Gaussian sparse signals**: `x*` has exactly `s` random non-zero entries drawn from `N(0,1)`.
-- FashionMNIST pixels are bounded `[0,1]`, spatially smooth, and only "soft-sparse" (~51.5% exact zeros). The remaining ~48.5% are *continuous, structured* non-zeros — not Gaussian.
+- FashionMNIST pixels are bounded `[0,1]`, spatially smooth, and only "soft-sparse" (~50% exact zeros). The remaining ~50% are *continuous, structured* non-zeros — not Gaussian.
 - HyperLISTA's threshold `θ = c1·μ·‖A⁺(Ax−b)‖₁` calibrates to the residual under a Gaussian sparse model. On FashionMNIST the residual reflects spatial image structure, not sparse noise → threshold zeros out valid signal.
-- For HyperLISTA, the original tuner c3_range=(0.5, 30) was too narrow: optimal c3 ≈ 0.01–0.17 (below the grid's lower bound). Fixed in Session 3 to c3_range=(0.01, 5.0).
+- For HyperLISTA, the original tuner c3_range=(0.5, 30) was too narrow: optimal c3 ≈ 0.17 in all four pixel-domain cells (below the grid's lower bound). Fixed in Session 3 to c3_range=(0.01, 5.0).
 
 **Interpretation for the report:** This is not a bug — it demonstrates a key MBDL lesson: *wrong prior (Gaussian sparse) is worse than no prior at all (LISTA)*. LISTA wins here because it is data-driven and learns the actual image distribution from 51K training images. This motivates the design of HyperLISTA extensions that account for bounded non-negative signals.
 
@@ -339,24 +339,24 @@ reconstructed as `x_hat = Psi.T @ alpha_hat`. SSIM across all four cells (pixel 
 
 | Cell | ISTA | FISTA | StepThr | LISTA-L2 | ALISTA | HyperLISTA |
 |------|------|-------|---------|----------|--------|------------|
-| FMNIST @ 0.25 | 0.13 → **0.26** | 0.13 → **0.35** | 0.13 → **0.52** | 0.82 → 0.81 | 0.12 → **0.40** | 0.08 → **0.52** |
-| FMNIST @ 0.5 | 0.30 → **0.45** | 0.33 → **0.57** | 0.33 → **0.68** | 0.88 → 0.82 | 0.31 → **0.69** | 0.34 → **0.71** |
-| MNIST @ 0.25 | 0.18 → **0.22** | 0.21 → **0.31** | 0.22 → **0.43** | 0.98 → 0.88 | 0.23 → **0.37** | 0.23 → **0.43** |
-| MNIST @ 0.5 | 0.43 → 0.45 | 0.59 → 0.57 | 0.74 → 0.65 | 0.99 → 0.85 | 0.82 → 0.66 | 0.81 → 0.66 |
+| FMNIST @ 0.25 | 0.13 → **0.26** | 0.13 → **0.35** | 0.14 → **0.52** | 0.83 → 0.81 | 0.13 → **0.40** | 0.09 → **0.52** |
+| FMNIST @ 0.5 | 0.29 → **0.45** | 0.31 → **0.57** | 0.32 → **0.68** | 0.89 → 0.82 | 0.30 → **0.69** | 0.32 → **0.71** |
+| MNIST @ 0.25 | 0.17 → **0.22** | 0.20 → **0.31** | 0.21 → **0.43** | 0.97 → 0.88 | 0.22 → **0.37** | 0.22 → **0.43** |
+| MNIST @ 0.5 | 0.42 → 0.45 | 0.58 → 0.57 | 0.73 → 0.65 | 0.99 → 0.85 | 0.81 → 0.66 | 0.82 → 0.66 |
 
 **Two-sided conclusion:**
 
 1. **The Fashion-MNIST collapse was a domain problem, not an algorithm problem.**
-   On FMNIST @ 0.25 HyperLISTA jumps from dead last (−0.27 dB, SSIM 0.085) to
+   On FMNIST @ 0.25 HyperLISTA jumps from dead last (−0.28 dB, SSIM 0.09) to
    −7.7 dB / SSIM 0.52 with the same 3 scalars, and its tuned `c3` returns to a
    healthy support-selection range (2.5–15.8 vs 0.17 in pixel space). At ratio 0.5
    HyperLISTA is the **best** structured method (−11.4 dB, SSIM 0.71).
 2. **The transform is not a free lunch.** On MNIST @ 0.5 — where pixels already form
-   a good sparse domain (~78% exact zeros) — the DCT actually *hurts* the structured
-   learners (ALISTA 0.82 → 0.66). Sparse recovery succeeds in whichever domain the
+   a good sparse domain (~81% exact zeros) — the DCT actually *hurts* the structured
+   learners (ALISTA 0.81 → 0.66). Sparse recovery succeeds in whichever domain the
    signal is genuinely sparsest; the domain choice is part of the model.
 3. **LISTA-L2 stays the robust ceiling** (SSIM 0.81–0.88 everywhere), but on
-   FMNIST @ 0.25 its NMSE lead over the best structured method shrinks from 12.5 dB
+   FMNIST @ 0.25 its NMSE lead over the best structured method shrinks from 13.0 dB
    to 7.1 dB once the prior matches the data.
 
 ---
@@ -376,7 +376,7 @@ $$\theta^{(k)} = c_1 \mu \|A^+(Ax^{(k)}-b)\|_1, \quad \beta^{(k)} = c_2 \mu \|x^
 The weight matrix $W = (G^TG)A$ is computed analytically (symmetric Jacobian parameterisation).
 
 ### Pixel-domain CS (Notebook 04)
-$$b = Ax + n, \quad x \in [0,1]^{784} \text{ (≈51.5\% exact zeros in pixel space)}$$
+$$b = Ax + n, \quad x \in [0,1]^{784} \text{ (≈50\% exact zeros in pixel space)}$$
 
 FashionMNIST images have a black background, making pixel vectors naturally sparse — no frequency transform is required.
 
