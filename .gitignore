@@ -9,7 +9,10 @@
 *.json
 # Allow sensing-matrix snapshots (needed to reload checkpoints on CPU)
 !results/checkpoints/A_*.npy
-# Allow notebook 05 summary tables and configs (tiny; NB04's were lost to this rule)
+# Allow notebook 04/05 summary tables and configs (tiny; keeps every archived
+# dataset x ratio cell reproducible from a fresh clone)
+!results/notebook_04/**/tables/*.csv
+!results/notebook_04/**/config.json
 !results/notebook_05/**/tables/*.csv
 !results/notebook_05/**/config.json
 
