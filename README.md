@@ -29,7 +29,7 @@ Methods compared:
 Evaluation covers two tasks:
 
 - **Part A:** Synthetic sparse vector recovery: $b = Ax^* + \varepsilon$
-- **Part B:** Compressed-sensing image reconstruction from MNIST/Fashion-MNIST, first in the **pixel domain** (notebook 04; FashionMNIST is ~50% near-zero in pixel space) and then revisited in the **DCT transform domain** (notebook 05; same measurements, recovery via the effective dictionary $D = A\Psi^\top$)
+- **Part B:** Compressed-sensing image reconstruction from MNIST/Fashion-MNIST, first in the **pixel domain** (notebook 04; Fashion-MNIST is ~50% near-zero in pixel space) and then revisited in the **DCT transform domain** (notebook 05; same measurements, recovery via the effective dictionary $D = A\Psi^\top$)
 
 We also systematically compare three **training strategies for unfolded optimizers** (Lecture 6):
 
@@ -54,13 +54,13 @@ hyperlista_mbdl_project/
 │   ├── 01_sparse_recovery_baselines.ipynb      # ISTA & FISTA sweeps (Part A baselines)
 │   ├── 02_lista_alista_hyperlista.ipynb         # LISTA / ALISTA / HyperLISTA, full comparison
 │   ├── 03_ista_unfolding_design_space.ipynb     # Our three scalar models + L1/L2/L3 comparison
-│   ├── 04_real_image_pixel_domain.ipynb         # MNIST/FashionMNIST pixel-domain CS (Part B)
+│   ├── 04_real_image_pixel_domain.ipynb         # MNIST/Fashion-MNIST pixel-domain CS (Part B)
 │   └── 05_transform_domain.ipynb                # DCT-domain CS via D = A·Psi^T (Part B follow-up)
 │
 ├── src/
 │   ├── data/
 │   │   ├── sparse_generator.py   # Synthetic sparse dataset
-│   │   └── image_loader.py       # MNIST/FashionMNIST CS loaders (pixel + DCT domain)
+│   │   └── image_loader.py       # MNIST/Fashion-MNIST CS loaders (pixel + DCT domain)
 │   ├── operators/
 │   │   └── dct_operators.py      # Separable 2D-DCT / IDCT
 │   ├── models/
@@ -151,7 +151,7 @@ A, D, Psi, train_loader, val_loader, test_loader = build_transform_cs_dataloader
 )
 ```
 
-- **Downloaded to:** `./data/` (auto-created on first run; MNIST and FashionMNIST are each ~12–35 MB)
+- **Downloaded to:** `./data/` (auto-created on first run; MNIST and Fashion-MNIST are each ~12–35 MB)
 - **Format:** Grayscale 28×28 images in [0,1], flattened to d = 784
 
 If you run the project without internet access, download the datasets once in
@@ -243,7 +243,7 @@ Contains two experiments:
 jupyter notebook 04_real_image_pixel_domain.ipynb
 ```
 
-FashionMNIST data is downloaded automatically to `./data/`.
+Fashion-MNIST data is downloaded automatically to `./data/`.
 
 ### Part B follow-up — Image CS (DCT transform domain)
 
@@ -290,7 +290,7 @@ lista.load_state_dict(torch.load('results/checkpoints/lista_L1.pt', map_location
 | **StepThresholdISTA** | **-23.6 dB** | **32** | **Beats LISTA with 187,000× fewer params** |
 | LISTA-L1 | -20.3 dB | 6,000,016 | Reference |
 
-**Key insight:** The step size schedule is the most valuable component to learn. `StepISTA` (16 scalars) matches `LISTA` (6M parameters). Decoupling the threshold from the step size adds another 3 dB at zero cost. This is the MBDL principle: structured scalar models beat unstructured matrix learners.
+**Key insight:** The step size schedule is the most valuable component to learn. `StepISTA` (16 scalars) matches `LISTA` (6M parameters). Decoupling the threshold from the step size adds another 3.6 dB at negligible cost (16 extra scalars). This is the MBDL principle: structured scalar models beat unstructured matrix learners.
 
 ### Part A — Training Methods (Notebook 03)
 
@@ -309,7 +309,7 @@ lista.load_state_dict(torch.load('results/checkpoints/lista_L1.pt', map_location
 
 **L3 observation:** NMSE-vs-layer flattens from ~layer 8 onward. Greedy training optimizes each step independently, so later layers have no incentive to improve over what earlier layers already solved.
 
-### Part B — FashionMNIST Pixel Domain (Notebook 04)
+### Part B — Fashion-MNIST Pixel Domain (Notebook 04)
 
 | Method | NMSE (ratio=0.25) | PSNR | SSIM |
 |--------|------------------|------|------|
@@ -325,11 +325,11 @@ lista.load_state_dict(torch.load('results/checkpoints/lista_L1.pt', map_location
 The reason is a signal-model mismatch:
 
 - ALISTA and HyperLISTA were **designed for i.i.d. Gaussian sparse signals**: `x*` has exactly `s` random non-zero entries drawn from `N(0,1)`.
-- FashionMNIST pixels are bounded `[0,1]`, spatially smooth, and only "soft-sparse" (~50% exact zeros). The remaining ~50% are *continuous, structured* non-zeros — not Gaussian.
-- HyperLISTA's threshold `θ = c1·μ·‖A⁺(Ax−b)‖₁` calibrates to the residual under a Gaussian sparse model. On FashionMNIST the residual reflects spatial image structure, not sparse noise → threshold zeros out valid signal.
-- For HyperLISTA, the original tuner c3_range=(0.5, 30) was too narrow: optimal c3 ≈ 0.17 in all four pixel-domain cells (below the grid's lower bound). Fixed in Session 3 to c3_range=(0.01, 5.0).
+- Fashion-MNIST pixels are bounded `[0,1]`, spatially smooth, and only "soft-sparse" (~50% exact zeros). The remaining ~50% are *continuous, structured* non-zeros — not Gaussian.
+- HyperLISTA's threshold `θ = c1·μ·‖A⁺(Ax−b)‖₁` calibrates to the residual under a Gaussian sparse model. On Fashion-MNIST the residual reflects spatial image structure, not sparse noise → threshold zeros out valid signal.
+- For HyperLISTA, the original tuner c3_range=(0.5, 30) was too narrow: optimal c3 ≈ 0.17 in all four pixel-domain cells (below the grid's lower bound). The search range was subsequently widened to c3_range=(0.01, 5.0).
 
-**Interpretation for the report:** This is not a bug — it demonstrates a key MBDL lesson: *wrong prior (Gaussian sparse) is worse than no prior at all (LISTA)*. LISTA wins here because it is data-driven and learns the actual image distribution from 51K training images. This motivates the design of HyperLISTA extensions that account for bounded non-negative signals.
+**Interpretation for the report:** This is not a bug — it demonstrates a key MBDL lesson: *wrong prior (Gaussian sparse) is worse than no prior at all (LISTA)*. LISTA wins here because it is data-driven and learns the actual image distribution from 55K training images. This motivates the design of HyperLISTA extensions that account for bounded non-negative signals.
 
 ### Part B follow-up — DCT Transform Domain (Notebook 05)
 
@@ -373,12 +373,12 @@ with adaptive parameters driven by only **three** scalars $(c_1, c_2, c_3)$:
 
 $$\theta^{(k)} = c_1 \mu \|A^+(Ax^{(k)}-b)\|_1, \quad \beta^{(k)} = c_2 \mu \|x^{(k)}\|_0, \quad p^{(k)} = c_3 \log\!\frac{\|A^+b\|_1}{\|A^+(Ax^{(k)}-b)\|_1}$$
 
-The weight matrix $W = (G^TG)A$ is computed analytically (symmetric Jacobian parameterisation).
+The weight matrix $W = (AA^T)^{-1}A$ is computed analytically (minimum-Frobenius-norm solution of $\|W^T A - I\|_F$), column-normalized so that $\mathrm{diag}(W^T A) = 1$.
 
 ### Pixel-domain CS (Notebook 04)
-$$b = Ax + n, \quad x \in [0,1]^{784} \text{ (≈50\% exact zeros in pixel space)}$$
+$$b = Ax + \varepsilon, \quad x \in [0,1]^{784} \text{ (≈50\% exact zeros in pixel space)}$$
 
-FashionMNIST images have a black background, making pixel vectors naturally sparse — no frequency transform is required.
+Fashion-MNIST images have a black background, making pixel vectors naturally sparse — no frequency transform is required.
 
 ### Training strategies (Notebook 03)
 
@@ -386,7 +386,7 @@ FashionMNIST images have a black background, making pixel vectors naturally spar
 |------|-----------|
 | L1 | $\mathcal{L} = \|x^{(K)} - x^*\|^2$ |
 | L2 | $\mathcal{L} = \|x^{(K)} - x^*\|^2 + \lambda \sum_k w_k \|x^{(k)} - x^*\|^2$ |
-| L3 | Train $\theta_k$ to minimise $\|x^{(k)} - x^*\|^2$ with $\theta_1,\ldots,\theta_{k-1}$ frozen |
+| L3 | Train $\theta_k$ to minimize $\|x^{(k)} - x^*\|^2$ with $\theta_1,\ldots,\theta_{k-1}$ frozen |
 
 ---
 
