@@ -55,7 +55,8 @@ hyperlista_mbdl_project/
 │   ├── 02_lista_alista_hyperlista.ipynb         # LISTA / ALISTA / HyperLISTA, full comparison
 │   ├── 03_ista_unfolding_design_space.ipynb     # Our three scalar models + L1/L2/L3 comparison
 │   ├── 04_real_image_pixel_domain.ipynb         # MNIST/Fashion-MNIST pixel-domain CS (Part B)
-│   └── 05_transform_domain.ipynb                # DCT-domain CS via D = A·Psi^T (Part B follow-up)
+│   ├── 05_transform_domain.ipynb                # DCT-domain CS via D = A·Psi^T (Part B follow-up)
+│   └── 06_multiseed_robustness.ipynb            # Multi-seed error bars for the headline comparisons
 │
 ├── src/
 │   ├── data/
@@ -288,22 +289,22 @@ lista.load_state_dict(torch.load('results/checkpoints/lista_L1.pt', map_location
 | ThresholdISTA | -7.1 dB | 16 | Learning θ alone barely helps |
 | StepISTA | -20.0 dB | 16 | Learning γ alone ≈ full LISTA |
 | **StepThresholdISTA** | **-23.6 dB** | **32** | **Beats LISTA with 187,000× fewer params** |
-| LISTA-L1 | -20.3 dB | 6,000,016 | Reference |
+| LISTA-L1 | -20.4 dB | 6,000,016 | Reference |
 
-**Key insight:** The step size schedule is the most valuable component to learn. `StepISTA` (16 scalars) matches `LISTA` (6M parameters). Decoupling the threshold from the step size adds another 3.6 dB at negligible cost (16 extra scalars). This is the MBDL principle: structured scalar models beat unstructured matrix learners.
+**Key insight:** The step size schedule is the most valuable component to learn. `StepISTA` (16 scalars) matches `LISTA` (6M parameters). Decoupling the threshold from the step size adds another 3.5 dB at negligible cost (16 extra scalars). This is the MBDL principle: structured scalar models beat unstructured matrix learners.
 
 ### Part A — Training Methods (Notebook 03)
 
 | Method | NMSE @ K=16 | # Params | Observation |
 |--------|------------|---------|-------------|
-| LISTA-L1 | -20.3 dB | 6,000,016 | Baseline (end-to-end BPTT) |
-| **LISTA-L2** | **-21.9 dB** | 6,000,016 | Deep supervision — best LISTA variant |
+| LISTA-L1 | -20.4 dB | 6,000,016 | Baseline (end-to-end BPTT) |
+| **LISTA-L2** | **-22.2 dB** | 6,000,016 | Deep supervision — best LISTA variant |
 | LISTA-L3 | -16.6 dB | 6,000,016 | Greedy training plateaus (~layer 8) |
-| LISTA-Tied-L1 | -19.1 dB | 375,001 | Near-untied accuracy, 16× fewer params |
-| ALISTA | -29.8 dB | 32 | Reference |
-| HyperLISTA | -61.4 dB | 3 | Reference |
+| LISTA-Tied-L1 | -19.3 dB | 375,001 | Near-untied accuracy, 16× fewer params |
+| ALISTA | -30.0 dB | 32 | Reference |
+| HyperLISTA | -62.9 dB | 3 | Reference |
 
-**Notable: LISTA-Tied nearly matches LISTA-Independent** (−19.1 vs −20.3 dB) despite 16× fewer parameters.
+**Notable: LISTA-Tied nearly matches LISTA-Independent** (−19.3 vs −20.4 dB) despite 16× fewer parameters.
 
 *Why?* LISTA with 6M independent parameters has a complex, poorly-conditioned loss landscape. The RNN-style weight tying acts as implicit regularization: all layers must share a single (W_y, W_x, θ), which makes gradient flow smoother and convergence more reliable. This is a concrete example of the MBDL principle: adding structure (even the mild constraint of weight sharing) preserves accuracy at a fraction of the parameter cost.
 
