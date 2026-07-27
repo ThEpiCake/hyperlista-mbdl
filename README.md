@@ -11,7 +11,11 @@ Final project for **Model-Based Deep Learning (361.2.2320)**, Ben-Gurion Univers
 
 ## Project Overview
 
-We implement, evaluate, and extend **HyperLISTA** — an ultra-lightweight deep-unrolled network for sparse linear inverse problems. Beyond reproducing the paper, we design and evaluate three original ISTA-derived scalar models that explore the MBDL design space.
+We implement and evaluate a simplified fixed-depth **HyperLISTA** variant—an
+ultra-lightweight deep-unrolled method for sparse linear inverse problems—and
+compare it with classical, learned, and analytic alternatives. We also design
+and evaluate three original ISTA-derived scalar models that explore the MBDL
+design space.
 
 Methods compared:
 
@@ -46,9 +50,10 @@ We also systematically compare three **training strategies for unfolded optimize
 ```
 hyperlista_mbdl_project/
 ├── submission/                                  # ★ Final deliverables for grading
-│   ├── MBDL_Final_Report.pdf                    # Final report (10 pages, course format)
-│   ├── MBDL_Seminar_Presentation.pptx           # Seminar slides (16 slides, EN, speaker notes)
-│   └── MBDL_Seminar_Presentation.pdf            # PDF export of the slides
+│   ├── MBDL_Final_Report.pdf                    # Public report (student IDs omitted)
+│   └── Seminar/
+│       ├── MBDL_Seminar_Presentation.pptx       # Seminar slides (16 slides, EN, speaker notes)
+│       └── MBDL_Seminar_Presentation.pdf        # PDF export of the slides
 │
 ├── notebooks/
 │   ├── 01_sparse_recovery_baselines.ipynb      # ISTA & FISTA sweeps (Part A baselines)
@@ -79,7 +84,8 @@ hyperlista_mbdl_project/
 │       └── visualizer.py         # NMSE-vs-layers, image grids, landscapes
 │
 ├── results/
-│   └── checkpoints/              # Saved model weights and HyperLISTA JSON files
+│   ├── checkpoints/              # Tracked sensing-matrix snapshots
+│   └── notebook_01 ... 06/       # Saved tables and figures from executed notebooks
 │
 ├── requirements.txt
 └── README.md
@@ -235,7 +241,7 @@ jupyter notebook 03_ista_unfolding_design_space.ipynb
 ```
 
 Contains two experiments:
-1. **ISTA component ablation** — ThresholdISTA, StepISTA, StepThresholdISTA
+1. **ISTA component comparison** — ThresholdISTA, StepISTA, StepThresholdISTA
 2. **Training method comparison** — L1 / L2 / L3 × {LISTA, LISTA-Tied}
 
 ### Part B — Image CS (Pixel domain)
@@ -264,7 +270,10 @@ the four {mnist, fashionmnist} × {0.25, 0.5} cells.
 
 PyTorch uses different random-number generators for CPU (Mersenne Twister) and GPU (Philox-4×32). Even with `torch.manual_seed(42)`, `torch.randn(..., device='cuda')` produces a **different matrix** than `torch.randn(..., device='cpu')`. LISTA and ALISTA learn weights that are specific to the training sensing matrix A, so they fail completely if evaluated with a different A.
 
-HyperLISTA is unaffected: its three scalars (c1, c2, c3) are dimensionless ratios, and W is recomputed analytically from whatever A you provide.
+HyperLISTA does not store a learned matrix tied to a particular sensing
+matrix: its analytic `W` is recomputed from the supplied `A`. Its measured
+performance can still vary with the sensing matrix, as evaluated in notebook
+06.
 
 **Fix applied:**
 - Notebooks 02 and 04 save `A_partA.npy` / `A_pixel_<ratio>.npy` (tracked by Git, gitignore has `!results/checkpoints/A_*.npy`).
@@ -280,7 +289,7 @@ lista.load_state_dict(torch.load('results/checkpoints/lista_L1.pt', map_location
 
 ## Key Findings
 
-### Part A — ISTA Component Ablation (Notebook 03)
+### Part A — ISTA Component Comparison (Notebook 03)
 
 | Method | NMSE @ K=16 | # Params | Observation |
 |--------|------------|---------|-------------|
@@ -321,16 +330,18 @@ lista.load_state_dict(torch.load('results/checkpoints/lista_L1.pt', map_location
 | ALISTA | -0.8 dB | 8.4 | 0.128 |
 | HyperLISTA | -0.3 dB | 7.7 | 0.091 |
 
-**ALISTA and HyperLISTA fail here — and this is expected.**
+**ALISTA and HyperLISTA perform poorly in this setting because their structure
+is mismatched to the image distribution.**
 
 The reason is a signal-model mismatch:
 
 - ALISTA and HyperLISTA were **designed for i.i.d. Gaussian sparse signals**: `x*` has exactly `s` random non-zero entries drawn from `N(0,1)`.
 - Fashion-MNIST pixels are bounded `[0,1]`, spatially smooth, and only "soft-sparse" (~50% exact zeros). The remaining ~50% are *continuous, structured* non-zeros — not Gaussian.
 - HyperLISTA's threshold `θ = c1·μ·‖A⁺(Ax−b)‖₁` calibrates to the residual under a Gaussian sparse model. On Fashion-MNIST the residual reflects spatial image structure, not sparse noise → threshold zeros out valid signal.
-- For HyperLISTA, the original tuner c3_range=(0.5, 30) was too narrow: optimal c3 ≈ 0.17 in all four pixel-domain cells (below the grid's lower bound). The search range was subsequently widened to c3_range=(0.01, 5.0).
-
-**Interpretation for the report:** This is not a bug — it demonstrates a key MBDL lesson: *wrong prior (Gaussian sparse) is worse than no prior at all (LISTA)*. LISTA wins here because it is data-driven and learns the actual image distribution from 55K training images. This motivates the design of HyperLISTA extensions that account for bounded non-negative signals.
+**Interpretation:** LISTA wins here because its learned update matrices can
+adapt to the image distribution from 55K training images, while the structured
+methods retain correction directions determined by the sensing matrix. This
+motivates testing a representation that better matches their sparsity prior.
 
 ### Part B follow-up — DCT Transform Domain (Notebook 05)
 
@@ -349,7 +360,7 @@ reconstructed as `x_hat = Psi.T @ alpha_hat`. SSIM across all four cells (pixel 
 
 1. **The Fashion-MNIST collapse was a domain problem, not an algorithm problem.**
    On FMNIST @ 0.25 HyperLISTA jumps from dead last (−0.28 dB, SSIM 0.09) to
-   −7.7 dB / SSIM 0.52 with the same 3 scalars, and its tuned `c3` returns to a
+   −7.7 dB / SSIM 0.52 with only three tuned constants, and its tuned `c3` returns to a
    healthy support-selection range (2.5–15.8 vs 0.17 in pixel space). At ratio 0.5
    HyperLISTA is the **best** structured method (−11.4 dB, SSIM 0.71).
 2. **The transform is not a free lunch.** On MNIST @ 0.5 — where pixels already form
@@ -379,7 +390,10 @@ The weight matrix $W = (AA^T)^{-1}A$ is computed analytically (minimum-Frobenius
 ### Pixel-domain CS (Notebook 04)
 $$b = Ax + \varepsilon, \quad x \in [0,1]^{784} \text{ (≈50\% exact zeros in pixel space)}$$
 
-Fashion-MNIST images have a black background, making pixel vectors naturally sparse — no frequency transform is required.
+Fashion-MNIST images have many zero-valued background pixels, but the
+pixel-domain representation proved insufficiently sparse and structured for
+the lightweight recovery methods. Notebook 05 therefore evaluates the same
+measurements in the DCT domain.
 
 ### Training strategies (Notebook 03)
 
